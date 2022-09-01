@@ -31,7 +31,7 @@ class exp:
                     exp_list.append(temp_var)
                     temp_var = ''
                 
-                exp_list.append(val)    
+                exp_list.append(val) 
             else:
                 temp_var+=val
         
@@ -80,11 +80,9 @@ class exp:
             return exp_list.index('^')
 
 
-
     def compress_parhentesis(self,expression):
-        outerleft_P_indices = [None,None]
 
-        p1 = expression.index('(')   # left parhentesis
+        p1 = expression.index('(')   # left outermost parhentesis
         depth = 1
         for i,c in enumerate(expression[p1+1:]):
             if c=='(':
@@ -100,6 +98,49 @@ class exp:
         expression[p1:p2+1] = [temp_root]
         return expression
 
+    def evaluate(self,root=None):
+        if root==None:
+            root= self.root
+
+        # For when the root val is in this set of classes return the raw value
+        if type(root.val) in [bool,int,float,float,complex]:
+            return root.val
+
+        elif root.val=='=':
+            right = self.evaluate(root.left)
+            if right==None:
+                return self.evaluate(root.left)
+
+        left = self.evaluate(root.left)
+        right = self.evaluate(root.right)
+
+        if left==None or right==None:
+            return None
+
+        if root.val=='+':
+            return left+right
+
+        elif root.val=='-':
+            return left-right
+
+        elif root.val=='*':
+            return left*right
+            
+        elif root.val=='^':
+            return left**right
+
+        elif root.val=='/':
+            return left/right
+
+        # Need to check functionality of logic operators
+        elif root.val=='&':
+            return left and right
+        
+        elif root.val=='|':
+            return left or right
+        
+        elif root.val=='!':
+            return not root.val
 
 
     def display(self,root=None):
@@ -161,6 +202,26 @@ class exp:
     def __str__(self):
         pass
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class node:
