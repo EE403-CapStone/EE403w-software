@@ -26,7 +26,7 @@ class exp:
         temp_var = ''
         for val in exp:
             # simple operators to handle in an exp
-            if val in '()^*/%+-=&!':
+            if val in '()^*/%+-=&|!':
                 if temp_var != '':
                     exp_list.append(temp_var)
                     temp_var = ''
@@ -37,29 +37,6 @@ class exp:
         
         if temp_var != '':
             exp_list.append(temp_var)
-
-
-        # Once the chunking is performed this loop looks for special operators
-
-        for i in range(len(exp_list)): # Special paralell operator ||
-            if '||' in exp_list[i]:
-                temp = exp_list[i].split('||')
-
-                for j in range(1,2*len(temp)-1,2):
-                    temp[j:j] = ['||']
-
-                temp = [e for e in temp if e]
-                exp_list[i:i+1] = temp
-
-
-            if '|' in exp_list[i] and not '||' in exp_list[i]: # logic or operator
-                temp = exp_list[i].split('|')
-
-                for j in range(1,2*len(temp)-1,2):
-                    temp[j:j] = ['|']
-
-                temp = [e for e in temp if e]
-                exp_list[i:i+1] = temp
 
         
         root = self.list2tree(exp_list)
