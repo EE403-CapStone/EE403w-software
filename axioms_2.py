@@ -26,40 +26,17 @@ class exp:
         temp_var = ''
         for val in exp:
             # simple operators to handle in an exp
-            if val in '()^*/%+-=&!':
+            if val in '()^*/%+-=&|!':
                 if temp_var != '':
                     exp_list.append(temp_var)
                     temp_var = ''
                 
-                exp_list.append(val)    
+                exp_list.append(val) 
             else:
                 temp_var+=val
         
         if temp_var != '':
             exp_list.append(temp_var)
-
-
-        # Once the chunking is performed this loop looks for special operators
-
-        for i in range(len(exp_list)): # Special paralell operator ||
-            if '||' in exp_list[i]:
-                temp = exp_list[i].split('||')
-
-                for j in range(1,2*len(temp)-1,2):
-                    temp[j:j] = ['||']
-
-                temp = [e for e in temp if e]
-                exp_list[i:i+1] = temp
-
-
-            if '|' in exp_list[i] and not '||' in exp_list[i]: # logic or operator
-                temp = exp_list[i].split('|')
-
-                for j in range(1,2*len(temp)-1,2):
-                    temp[j:j] = ['|']
-
-                temp = [e for e in temp if e]
-                exp_list[i:i+1] = temp
 
         
         root = self.list2tree(exp_list)
@@ -103,11 +80,9 @@ class exp:
             return exp_list.index('^')
 
 
-
     def compress_parhentesis(self,expression):
-        outerleft_P_indices = [None,None]
 
-        p1 = expression.index('(')   # left parhentesis
+        p1 = expression.index('(')   # left outermost parhentesis
         depth = 1
         for i,c in enumerate(expression[p1+1:]):
             if c=='(':
@@ -123,6 +98,49 @@ class exp:
         expression[p1:p2+1] = [temp_root]
         return expression
 
+    def evaluate(self,root=None):
+        if root==None:
+            root= self.root
+
+        # For when the root val is in this set of classes return the raw value
+        if type(root.val) in [bool,int,float,float,complex]:
+            return root.val
+
+        elif root.val=='=':
+            right = self.evaluate(root.left)
+            if right==None:
+                return self.evaluate(root.left)
+
+        left = self.evaluate(root.left)
+        right = self.evaluate(root.right)
+
+        if left==None or right==None:
+            return None
+
+        if root.val=='+':
+            return left+right
+
+        elif root.val=='-':
+            return left-right
+
+        elif root.val=='*':
+            return left*right
+            
+        elif root.val=='^':
+            return left**right
+
+        elif root.val=='/':
+            return left/right
+
+        # Need to check functionality of logic operators
+        elif root.val=='&':
+            return left and right
+        
+        elif root.val=='|':
+            return left or right
+        
+        elif root.val=='!':
+            return not root.val
 
 
     def display(self,root=None):
@@ -184,6 +202,26 @@ class exp:
     def __str__(self):
         pass
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class node:
