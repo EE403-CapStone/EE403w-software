@@ -28,7 +28,8 @@ class exp:
             # simple operators to handle in an exp
             if val in '()^*/%+-=&|!':
                 if temp_var != '':
-                    exp_list.append(temp_var)
+                    # str to values function
+                    exp_list.append(self.str2values(temp_var))
                     temp_var = ''
                 
                 exp_list.append(val) 
@@ -36,13 +37,56 @@ class exp:
                 temp_var+=val
         
         if temp_var != '':
-            exp_list.append(temp_var)
+            exp_list.append(self.str2values(temp_var))
 
         
         root = self.list2tree(exp_list)
 
         return root
-    
+
+    def str2values(self,s:str)->any:
+        # recognize special string inputs example True False
+        if s=='True':
+            return True
+        elif s=='False':
+            return False
+        elif s=='pi':
+            return 3.14159265358979323846
+        elif s == 'e':
+            return 2.718281828459045
+        
+        ## Need to make a list of reserved strings ##
+
+
+        # recognize if the string is a valid number return an error if not
+        iscomplex = s[-1]=='j' and s != 'j'
+        s = s[:-1] if iscomplex else s
+
+        # Handling integer values
+        if s.isdigit():
+            r = int(s)*1j if iscomplex else int(s)
+            return r
+        
+        # Handling floats
+        if s.count('.')==1:
+            z,decimal = s.split('.')
+            if not z.isdigit() or not decimal.isdigit():
+                raise Exception(f'{s} is not a valid number or variable')
+
+            r = r*1j if iscomplex else r
+            return r
+
+        elif s.count('.')>1:
+            raise Exception(f'{s} is not a valid number or variable')
+        
+
+        if s[0].isdigit():
+            raise Exception(f'variable {s} cannot start with a number or is an incorrectly formatted number')
+        
+        # When s cannot be converted into some number and is correctly formatted as a variable
+        # pass it back as a string
+        return s
+
     def list2tree(self,op_list:list):
         while '(' in op_list:   # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
@@ -62,6 +106,7 @@ class exp:
         return node(val,left,right)
     
     def next_operator(self,exp_list):
+        # Switch case of PEMDOS in reverse order
         if '=' in exp_list:
             return exp_list.index('=')
         if '|' in exp_list:
@@ -132,6 +177,8 @@ class exp:
         elif root.val=='/':
             return left/right
 
+        elif root.val=='%':
+            return left%right
         # Need to check functionality of logic operators
         elif root.val=='&':
             return left and right
@@ -202,10 +249,6 @@ class exp:
     def __str__(self):
         pass
     
-
-
-
-
 
 
 
