@@ -57,7 +57,6 @@ class exp:
         
         ## Need to make a list of reserved strings ##
 
-
         # recognize if the string is a valid number return an error if not
         iscomplex = s[-1]=='j' and s != 'j'
         s = s[:-1] if iscomplex else s
@@ -85,6 +84,7 @@ class exp:
         
         # When s cannot be converted into some number and is correctly formatted as a variable
         # pass it back as a string
+        s = s+j if iscomplex else s
         return s
 
     def list2tree(self,op_list:list):
