@@ -37,14 +37,14 @@ class exp:
                 temp_var+=val
         
         if temp_var != '':
-            exp_list.append(self.str2values(temp_var))
+            exp_list.append(self._str2values(temp_var))
 
         
         root = self.list2tree(exp_list)
 
         return root
 
-    def str2values(self,s:str)->any:
+    def _str2values(self,s:str)->any:
         # recognize special string inputs example True False
         if s=='True':
             return True
@@ -84,7 +84,7 @@ class exp:
         
         # When s cannot be converted into some number and is correctly formatted as a variable
         # pass it back as a string
-        s = s+j if iscomplex else s
+        s = s+'j' if iscomplex else s
         return s
 
     def list2tree(self,op_list:list):
