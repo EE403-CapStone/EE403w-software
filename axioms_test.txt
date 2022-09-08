@@ -1,0 +1,40 @@
+The testfile for axioms
+Passing the this file without any errors is the goal of the project
+
+Test sections
+
+1.) Initializing expression graphs
+    - Validity of expressions
+    - Recognizing errors and returning helpful messages
+
+2.) Evaluating expression graphs
+    - Expressions are evaluated correctly
+    - Expressions that cannot be evaluated return None
+
+3.) Solving Graphs
+    - Returns the correct amount of solutions for graphs
+    - Returns the correct solutions for graphs
+    - Solve's for solvable values and returns the values that cannot be solved for
+
+4.) Calculus
+    - Solves for derivatives of functions
+    - Numerical analysis for estimating solutions to non analytical algebraic problems
+
+*** Stretch ***
+4.) Linear regression
+
+5.) Automating readable work in Latex
+    - returns work that can be followed/read by a person in a movable format
+
+
+Section 1.)
+============================================================================
+
+>>> import numpy as np
+>>> from axioms_2 import exp
+>>> pi = exp('pi')
+>>> pi.evaluate()==np.pi
+True
+>>> e = exp('e')
+>>> e.evaluate()==np.e
+True

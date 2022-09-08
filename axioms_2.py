@@ -29,7 +29,7 @@ class exp:
             if val in '()^*/%+-=&|!':
                 if temp_var != '':
                     # str to values function
-                    exp_list.append(self.str2values(temp_var))
+                    exp_list.append(self._str2values(temp_var))
                     temp_var = ''
                 
                 exp_list.append(val) 
@@ -88,6 +88,10 @@ class exp:
         return s
 
     def list2tree(self,op_list:list):
+        if len(op_list)==1:
+            # need to check whether single valued expression is value
+            return node(op_list[0])
+
         while '(' in op_list:   # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
 
@@ -249,22 +253,6 @@ class exp:
     def __str__(self):
         pass
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class node:
