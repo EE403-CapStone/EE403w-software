@@ -9,6 +9,8 @@ class exp:
         
         if 'exp' in kwargs:
             self.root = self.exp2tree(kwargs['exp'])
+        self.dir = {}
+        self.map()
 
     def exp2tree(self,exp,latex = False):
         exp_list = []
@@ -251,18 +253,17 @@ class exp:
         if base == None:
             base = self.root
 
-        if self.isoperand(base.val):
-            if base.val not in self.dir:
-                self.dir[base.val] = []
-            self.dir[base.val].append(d)
+        if base.val not in self.dir:
+            self.dir[base.val] = []
+
+        self.dir[base.val].append(d)
 
         if base.left is not None:
             self.map(base.left,d+[1])
 
         if base.right is not None:
             self.map(base.right,d+[0])
-    
-    
+
     
     def __str__(self):
         pass
