@@ -10,7 +10,6 @@ class exp:
         if 'exp' in kwargs:
             self.root = self.exp2tree(kwargs['exp'])
 
-
     def exp2tree(self,exp,latex = False):
         exp_list = []
 
@@ -128,7 +127,6 @@ class exp:
         if '^' in exp_list:
             return exp_list.index('^')
 
-
     def compress_parhentesis(self,expression):
 
         p1 = expression.index('(')   # left outermost parhentesis
@@ -193,7 +191,6 @@ class exp:
         elif root.val=='!':
             return not root.val
 
-
     def display(self,root=None):
         if root==None:
             root = self.root
@@ -250,13 +247,29 @@ class exp:
     def solve():
         pass
 
+    def map(self,base = None,d = []): # sets the index of the variable to the value index
+        if base == None:
+            base = self.root
+
+        if self.isoperand(base.val):
+            if base.val not in self.dir:
+                self.dir[base.val] = []
+            self.dir[base.val].append(d)
+
+        if base.left is not None:
+            self.map(base.left,d+[1])
+
+        if base.right is not None:
+            self.map(base.right,d+[0])
+    
+    
+    
     def __str__(self):
         pass
     
 
-
 class node:
-    def __init__(self,val,left = None,right = None):
+    def __init__(self,val,left:any= None,right:any = None):
         self.val = val
         self.right = right
         self.left = left
