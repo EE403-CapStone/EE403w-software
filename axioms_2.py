@@ -267,7 +267,105 @@ class exp:
     
     def __str__(self):
         pass
-    
+
+### in production ###
+def invert_branch(self,var):
+		self.dir = {}
+		self.map()
+
+		if var not in self.dir.keys():
+			raise Exception(f"({var}) not in {self.tree2exp()}")
+		
+		d = self.dir[var]
+		d = d[0]
+
+		root = self.root
+		invtree = exp()
+
+
+		for e in d:
+
+			if e:
+				temp = root.right # the part that branches away from the direction to the var
+				
+			else:
+				temp = root.left
+
+
+			if root.val=='+':
+				base = operator('-')
+				base.left = invtree()
+				base.right = temp
+
+				invtree.root = base
+
+			elif root.val=='-':
+				if e:
+					base = node('+',temp,invtree())
+
+					invtree.root = base
+				else:
+					base = operator('-')
+					base.right = invtree()
+					base.left = temp
+
+					invtree.root = base
+
+
+			elif root.val=='*':
+				base = operator('/')
+				base.left = invtree()
+				base.right = temp
+
+				invtree.root = base
+
+			elif root.val =='/':
+				if e:
+					base = operator('*')
+					base.right = invtree()
+					base.left = temp
+
+					invtree.root = base
+
+				else:
+					base = operator('/')
+					base.right = invtree()
+					base.left = temp
+
+					invtree.root = base
+
+			
+			elif root.val =='^':
+				if e:
+					base1 = operator('/')
+					base1.left = operand(1)
+					base1.right = temp
+
+					base = operator('^')
+					base.right = base1
+					base.left = invtree()
+					invtree.root = base
+				else:
+					raise Exception(f"Cannot evaluate '^' for '{root.val}' in ({self.tree2exp(temp)})^({self.tree2exp(root.right)})={self.tree2exp(invtree())}")
+
+			elif root.val=='=':
+				if invtree() is not None:
+					base = operator('=')
+					base.right = invtree()
+					base.left = temp
+					invtree.root = base
+
+				else:
+					invtree.root=temp
+
+
+			if e:
+				root = root.left # the path to var
+				
+			else:
+				root = root.right
+
+		return invtree
 
 class node:
     def __init__(self,val,left:any= None,right:any = None):
