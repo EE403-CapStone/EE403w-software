@@ -1,3 +1,6 @@
+import doctest
+
+
 class exp:
     def __init__(self,exp=None,**kwargs):
         self.root = None
@@ -264,9 +267,26 @@ class exp:
         if base.right is not None:
             self.map(base.right,d+[0])
 
+
     
     def __str__(self):
-        pass
+        # Returns a str representation of the graph
+        # Needs to be edited to correctly insert graphs
+        """
+        >>> print(exp('a+b'))
+        a+b
+        """        
+        return self._str_aux(self.root)
+
+    def _str_aux(self,base):
+
+        if base == None:
+            return''
+        
+        if base.val=='^':
+            return self._str_aux(base.left) + base.val + '('+self._str_aux(base.right)+')'
+        
+        return self._str_aux(base.left) + base.val + self._str_aux(base.right)
 
 ### in production ###
 def invert_branch(self,var):
@@ -375,3 +395,8 @@ class node:
 
     # def __call__(self):
     #     return self.val
+
+
+if __name__=="__main__":
+    import doctest
+    doctest.testmod()
