@@ -13,7 +13,7 @@ class exp:
         if 'exp' in kwargs:
             self.root = self.exp2tree(kwargs['exp'])
         self.dir = {}
-        self.map()
+        # self.map()
 
     def exp2tree(self,exp,latex = False):
         exp_list = []
@@ -92,24 +92,23 @@ class exp:
         return s
 
     def list2tree(self,op_list:list):
-        if len(op_list)==1:
-            # need to check whether single valued expression is value
-            return node(op_list[0])
 
         while '(' in op_list:   # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
 
         if len(op_list)==1:
-            if isinstance(op_list[0],str):
+            if type(op_list[0])==str:
                 return node(op_list[0])
-            else:
-                return op_list[0]
+
+            elif type(op_list[0])==list:
+                return self.list2tree(op_list[0])
         
         next_operator = self.next_operator(op_list)
 
         val = op_list[next_operator]
-        right = self.list2tree(op_list[next_operator+1:])
         left = self.list2tree(op_list[:next_operator])
+        right = self.list2tree(op_list[next_operator+1:])
+        
 
         return node(val,left,right)
     
@@ -132,11 +131,11 @@ class exp:
         if '^' in exp_list:
             return exp_list.index('^')
 
-    def compress_parhentesis(self,expression):
+    def compress_parhentesis(self,exp_list):
 
-        p1 = expression.index('(')   # left outermost parhentesis
+        p1 = exp_list.index('(')   # left outermost parhentesis
         depth = 1
-        for i,c in enumerate(expression[p1+1:]):
+        for i,c in enumerate(exp_list[p1+1:]):
             if c=='(':
                 depth+=1
             elif c==')':
@@ -146,9 +145,9 @@ class exp:
                 break
         
         p2 = p1+i+1
-        temp_root = self.list2tree(expression[p1+1:p2])
-        expression[p1:p2+1] = [temp_root]
-        return expression
+
+        exp_list[p1:p2+1] = [[exp_list[p1+1:p2]]]
+        return exp_list
 
     def evaluate(self,root=None):
         if root==None:
@@ -267,26 +266,27 @@ class exp:
         if base.right is not None:
             self.map(base.right,d+[0])
 
-
-    
     def __str__(self):
-        # Returns a str representation of the graph
-        # Needs to be edited to correctly insert graphs
+        # Returns a string expression that will produce the same graph
+        # exp==exp(str(exp))
         """
         >>> print(exp('a+b'))
         a+b
+        >>> print(exp('(a+b)*c'))
+        (a+b)*c
         """        
         return self._str_aux(self.root)
 
-    def _str_aux(self,base):
+    def _str_aux(self,base,last_operator = None):
+        op_order = {'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6,'=':7}
 
-        if base == None:
-            return''
+        if base.val not in op_order:
+            return base.val
         
-        if base.val=='^':
-            return self._str_aux(base.left) + base.val + '('+self._str_aux(base.right)+')'
+        if last_operator and op_order[base.val]<op_order[last_operator]:
+            return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
         
-        return self._str_aux(base.left) + base.val + self._str_aux(base.right)
+        return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
 
 ### in production ###
 def invert_branch(self,var):
