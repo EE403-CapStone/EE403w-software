@@ -1,3 +1,6 @@
+import doctest
+
+
 class exp:
     def __init__(self,exp=None,**kwargs):
         self.root = None
@@ -9,7 +12,8 @@ class exp:
         
         if 'exp' in kwargs:
             self.root = self.exp2tree(kwargs['exp'])
-
+        self.dir = {}
+        # self.map()
 
     def exp2tree(self,exp,latex = False):
         exp_list = []
@@ -88,24 +92,23 @@ class exp:
         return s
 
     def list2tree(self,op_list:list):
-        if len(op_list)==1:
-            # need to check whether single valued expression is value
-            return node(op_list[0])
 
         while '(' in op_list:   # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
 
         if len(op_list)==1:
-            if isinstance(op_list[0],str):
+            if type(op_list[0])==str:
                 return node(op_list[0])
-            else:
-                return op_list[0]
+
+            elif type(op_list[0])==list:
+                return self.list2tree(op_list[0])
         
         next_operator = self.next_operator(op_list)
 
         val = op_list[next_operator]
-        right = self.list2tree(op_list[next_operator+1:])
         left = self.list2tree(op_list[:next_operator])
+        right = self.list2tree(op_list[next_operator+1:])
+        
 
         return node(val,left,right)
     
@@ -128,12 +131,11 @@ class exp:
         if '^' in exp_list:
             return exp_list.index('^')
 
+    def compress_parhentesis(self,exp_list):
 
-    def compress_parhentesis(self,expression):
-
-        p1 = expression.index('(')   # left outermost parhentesis
+        p1 = exp_list.index('(')   # left outermost parhentesis
         depth = 1
-        for i,c in enumerate(expression[p1+1:]):
+        for i,c in enumerate(exp_list[p1+1:]):
             if c=='(':
                 depth+=1
             elif c==')':
@@ -143,9 +145,9 @@ class exp:
                 break
         
         p2 = p1+i+1
-        temp_root = self.list2tree(expression[p1+1:p2])
-        expression[p1:p2+1] = [temp_root]
-        return expression
+
+        exp_list[p1:p2+1] = [[exp_list[p1+1:p2]]]
+        return exp_list
 
     def evaluate(self,root=None):
         if root==None:
@@ -192,7 +194,6 @@ class exp:
         
         elif root.val=='!':
             return not root.val
-
 
     def display(self,root=None):
         if root==None:
@@ -250,16 +251,152 @@ class exp:
     def solve():
         pass
 
-    def __str__(self):
-        pass
-    
+    def map(self,base = None,d = []): # sets the index of the variable to the value index
+        if base == None:
+            base = self.root
 
+        if base.val not in self.dir:
+            self.dir[base.val] = []
+
+        self.dir[base.val].append(d)
+
+        if base.left is not None:
+            self.map(base.left,d+[1])
+
+        if base.right is not None:
+            self.map(base.right,d+[0])
+
+    def __str__(self):
+        # Returns a string expression that will produce the same graph
+        # exp==exp(str(exp))
+        """
+        >>> print(exp('a+b'))
+        a+b
+        >>> print(exp('(a+b)*c'))
+        (a+b)*c
+        """        
+        return self._str_aux(self.root)
+
+    def _str_aux(self,base,last_operator = None):
+        op_order = {'=':1,'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6}
+
+        if base.val not in op_order:
+            return base.val
+        
+        if last_operator and op_order[base.val]<op_order[last_operator]:
+            return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
+        
+        return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
+
+### in production ###
+def invert_branch(self,var):
+		self.dir = {}
+		self.map()
+
+		if var not in self.dir.keys():
+			raise Exception(f"({var}) not in {self.tree2exp()}")
+		
+		d = self.dir[var]
+		d = d[0]
+
+		root = self.root
+		invtree = exp()
+
+
+		for e in d:
+
+			if e:
+				temp = root.right # the part that branches away from the direction to the var
+				
+			else:
+				temp = root.left
+
+
+			if root.val=='+':
+				base = operator('-')
+				base.left = invtree()
+				base.right = temp
+
+				invtree.root = base
+
+			elif root.val=='-':
+				if e:
+					base = node('+',temp,invtree())
+
+					invtree.root = base
+				else:
+					base = operator('-')
+					base.right = invtree()
+					base.left = temp
+
+					invtree.root = base
+
+
+			elif root.val=='*':
+				base = operator('/')
+				base.left = invtree()
+				base.right = temp
+
+				invtree.root = base
+
+			elif root.val =='/':
+				if e:
+					base = operator('*')
+					base.right = invtree()
+					base.left = temp
+
+					invtree.root = base
+
+				else:
+					base = operator('/')
+					base.right = invtree()
+					base.left = temp
+
+					invtree.root = base
+
+			
+			elif root.val =='^':
+				if e:
+					base1 = operator('/')
+					base1.left = operand(1)
+					base1.right = temp
+
+					base = operator('^')
+					base.right = base1
+					base.left = invtree()
+					invtree.root = base
+				else:
+					raise Exception(f"Cannot evaluate '^' for '{root.val}' in ({self.tree2exp(temp)})^({self.tree2exp(root.right)})={self.tree2exp(invtree())}")
+
+			elif root.val=='=':
+				if invtree() is not None:
+					base = operator('=')
+					base.right = invtree()
+					base.left = temp
+					invtree.root = base
+
+				else:
+					invtree.root=temp
+
+
+			if e:
+				root = root.left # the path to var
+				
+			else:
+				root = root.right
+
+		return invtree
 
 class node:
-    def __init__(self,val,left = None,right = None):
+    def __init__(self,val,left:any= None,right:any = None):
         self.val = val
         self.right = right
         self.left = left
 
     # def __call__(self):
     #     return self.val
+
+
+if __name__=="__main__":
+    import doctest
+    doctest.testmod()
