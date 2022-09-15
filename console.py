@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 from axioms_2 import exp
+import sys
+import random
+from PySide6 import QtCore, QtWidgets, QtGui
+"""
+returns the arguments of cmd_string
+"""
+def trim_command(cmd_string):
+    if not ' ' in cmd_string:
+        return '' # there is only one token in this string
+
+    n = cmd_string.find(' ')
+    return cmd_string[n+1:]
+
 
 
 """
@@ -7,25 +20,94 @@ The State class contains the current state of the application.
 it provides methods which can be used to modify the state, or be bound
 to commands which are then typed by the user.
 
-this design pattern has the benefit which allows the type of interface
-used easily interchangable (ie, output using curses to terminal, create a custom window
-with a graphcis library such as WebGPU or OpenGL and draw to a pixel buffer)
+this design pattern allows the interface type to be easily interchangable (ie, output
+using curses to terminal, create a custom window with a graphcis library such as WebGPU
+or OpenGL and draw to a pixel buffer)
 """
 class State:
     def __init__(self):
         self.expressions = []
         self.exit_prog = False
+        self.command_buffer = [] # commands which need to be processed
+        self.output_buffer = [] # lines which need to be printed to the screen
 
     # TODO this doesn't parse the expression, and includes the command keyword in cmd
     def set_expr(self, cmd):
-        self.expressions.append(exp(cmd))
+        n = trim_command(cmd)
+        self.print(n)
+        self.print(exp(n).display())
 
     def exit_prog(self, cmd):
         self.exit_prog = True
 
     def list_exprs(self, cmd):
-        print(self.expressions)
+        for e in self.expressions:
+            self.print(e.display())
+            self.state.outpu    .append()
 
+    def print(self, txt):
+        self.output_buffer.append(str(txt))
+
+    def process_cmd(self):
+        cmd = self.command_buffer.pop()
+
+        if cmd is None:
+            return
+
+        tokens = cmd.split(' ')
+
+        # these are the bindings between the state modifier functions and the
+        # commands that the user can actually type
+        #
+        # Commands are standardized in that they only take the command line string.
+        # each function is responsible for parsing the input itself.
+        #
+        # TODO the implied set_expr is not implemented yet.
+        # TODO create a new commmand class which includes documentation for each command
+        commands = {
+            "exit": State.exit_prog,
+            "set_expr": State.set_expr,
+            "list": State.list_exprs,
+            "help": lambda state, cmd : self.print(list(commands.keys()))
+        }
+
+        # after the command is evaluated, then any changes in state are reflected
+        # in the user interface.
+        if tokens[0] in commands:
+            commands[tokens[0]](self, cmd)
+
+
+
+class MainWindow(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self.state = State()
+
+        self.command_buffer = [] # list of commands which still need to be processed
+
+        # history output. FIXME text is vertically aligned at top of frame
+        self.output_hist = QtWidgets.QTextEdit("Initial text...")
+        self.output_hist.setReadOnly(True)
+
+        self.cmd_input = QtWidgets.QLineEdit()
+
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.addWidget(self.output_hist)
+        self.layout.addWidget(self.cmd_input)
+
+        self.cmd_input.returnPressed.connect(self.on_enter)
+
+    @QtCore.Slot()
+    def on_enter(self):
+        self.state.command_buffer.append(self.cmd_input.text())
+        self.cmd_input.clear()
+
+        self.state.process_cmd()
+
+        for t in self.state.output_buffer:
+            self.output_hist.append(t)
+
+        self.state.output_buffer.clear()
 
 
 
@@ -45,31 +127,14 @@ list of valid commands:
 for convenience, there is an implicit set_expr command. If the first token isn't
 a valid command, then it is assumed that the user input are paremeters for set_expr
 """
-state = State()
-while True:
-    cmd_string = input('>> ')
+if __name__ == "__main__":
+    #setup QT6 context
+    app = QtWidgets.QApplication([])
 
-    tokens = cmd_string.split(' ')
+    widget = MainWindow()
+    widget.resize(800, 600)
+    widget.show()
 
-    # these are the bindings between the state modifier functions and the
-    # commands that the user can actually type
-    #
-    # Commands are standardized in that they only take the command line string.
-    # each function is responsible for parsing the input itself.
-    #
-    # TODO the implied set_expr is not implemented yet.
-    # TODO create a new commmand class which includes documentation for each command
-    commands = {
-        "exit": State.exit_prog,
-        "set_expr": State.set_expr,
-        "list": State.list_exprs,
-        "help": lambda state, cmd : print(list(commands.keys()))
-    }
+    app.exec()
 
-    # after the command is evaluated, then any changes in state are reflected
-    # in the user interface.
-    if tokens[0] in commands:
-        commands[tokens[0]](state, cmd_string)
-
-    if state.exit_prog == True:
-        break
+    sys.exit()
