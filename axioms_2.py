@@ -278,7 +278,7 @@ class exp:
         return self._str_aux(self.root)
 
     def _str_aux(self,base,last_operator = None):
-        op_order = {'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6,'=':7}
+        op_order = {'=':1,'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6}
 
         if base.val not in op_order:
             return base.val
