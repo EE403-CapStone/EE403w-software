@@ -105,8 +105,8 @@ class exp:
         
         next_operator = self.next_operator(op_list)
 
-        if next_operator==0 and op_list[0]=='-':            # case of -x
-            return self.node('-',0,self.list2tree(op_list[1:]))
+        # if next_operator==0 and op_list[0]=='-':            # case of -x
+        #     return self.node('-',0,self.list2tree(op_list[1:]))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
