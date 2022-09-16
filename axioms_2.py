@@ -97,13 +97,16 @@ class exp:
             op_list = self.compress_parhentesis(op_list)
 
         if len(op_list)==1:
-            if type(op_list[0])==str:
+            if type(op_list[0])in [str,bool, int, float, complex]:
                 return node(op_list[0])
 
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
         next_operator = self.next_operator(op_list)
+
+        if next_operator==0 and op_list[0]=='-':            # case of -x
+            return self.node('-',0,self.list2tree(op_list[1:]))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
@@ -281,7 +284,7 @@ class exp:
         op_order = {'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6,'=':7}
 
         if base.val not in op_order:
-            return base.val
+            return str(base.val)
         
         if last_operator and op_order[base.val]<op_order[last_operator]:
             return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
