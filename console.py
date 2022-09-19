@@ -26,7 +26,7 @@ or OpenGL and draw to a pixel buffer)
 """
 class State:
     def __init__(self):
-        self.expressions = []
+        self.expressions = {}
         self.exit_prog = False
         self.command_buffer = [] # commands which need to be processed
         self.output_buffer = [] # lines which need to be printed to the screen
@@ -34,16 +34,15 @@ class State:
     # TODO this doesn't parse the expression, and includes the command keyword in cmd
     def set_expr(self, cmd):
         n = trim_command(cmd)
-        self.print(n)
-        self.print(exp(n).display())
+        self.expressions['ans'] = exp(n)
+        self.print('ans: ' +  str(self.expressions['ans']))
 
     def exit_prog(self, cmd):
         self.exit_prog = True
 
     def list_exprs(self, cmd):
-        for e in self.expressions:
-            self.print(e.display())
-            self.state.outpu    .append()
+        for k,e in self.expressions.items():
+            self.print(str(k) + ': ' + str(e))
 
     def print(self, txt):
         self.output_buffer.append(str(txt))
@@ -71,10 +70,12 @@ class State:
             "help": lambda state, cmd : self.print(list(commands.keys()))
         }
 
-        # after the command is evaluated, then any changes in state are reflected
+        # after the command is evaluated any changes in state are reflected
         # in the user interface.
         if tokens[0] in commands:
             commands[tokens[0]](self, cmd)
+        else:
+            self.print('"' + tokens[0] + '" is not a recognized command or script.')
 
 
 
@@ -86,7 +87,14 @@ class MainWindow(QtWidgets.QWidget):
         self.command_buffer = [] # list of commands which still need to be processed
 
         # history output. FIXME text is vertically aligned at top of frame
-        self.output_hist = QtWidgets.QTextEdit("Initial text...")
+        # TODO add label widget next to line entry widget
+        self.output_hist = QtWidgets.QTextEdit('')
+        self.output_hist.setText(
+"""CALCULATOR RUNTIME ENVIRONMENT
+Written by Ethan Smith and Erik Huuki
+for a list of available commands, type 'help'
+"""
+        )
         self.output_hist.setReadOnly(True)
 
         self.cmd_input = QtWidgets.QLineEdit()
@@ -99,7 +107,8 @@ class MainWindow(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def on_enter(self):
-        self.state.command_buffer.append(self.cmd_input.text())
+        self.state.command_buffer.append(self.cmd_input.text())  # put command in line to be processed
+        self.state.output_buffer.append(self.cmd_input.text())   # record command in output
         self.cmd_input.clear()
 
         self.state.process_cmd()
@@ -108,6 +117,7 @@ class MainWindow(QtWidgets.QWidget):
             self.output_hist.append(t)
 
         self.state.output_buffer.clear()
+        self.state.output_buffer.append('') # add a blank line for formatting
 
 
 
