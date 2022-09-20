@@ -103,10 +103,10 @@ class exp:
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
+        if op_list[0]=='-':            # case of -x
+            op_list[:2] = [-1,'*',op_list[1]]
+            
         next_operator = self.next_operator(op_list)
-
-        # if next_operator==0 and op_list[0]=='-':            # case of -x
-        #     return self.node('-',0,self.list2tree(op_list[1:]))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
@@ -288,7 +288,7 @@ class exp:
         
         if last_operator and op_order[base.val]<op_order[last_operator]:
             return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
-        
+
         return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
 
 ### in production ###
