@@ -2,8 +2,9 @@ import doctest
 
 
 class exp:
-    def __init__(self,exp=None,**kwargs):
-        self.root = None
+    def __init__(self,exp=None,root=None,**kwargs):
+        self.root = root
+
         if isinstance(exp,str):
             self.root = self.exp2tree(exp)
         
@@ -13,7 +14,7 @@ class exp:
         if 'exp' in kwargs:
             self.root = self.exp2tree(kwargs['exp'])
         self.dir = {}
-        # self.map()
+        self.map()
 
     def exp2tree(self,exp,latex = False):
         exp_list = []
@@ -258,10 +259,10 @@ class exp:
         if base == None:
             base = self.root
 
-        if base.val not in self.dir:
-            self.dir[base.val] = []
-
-        self.dir[base.val].append(d)
+        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-=&|!':
+            if base.val not in self.dir:
+                self.dir[base.val] = []
+            self.dir[base.val].append(d)
 
         if base.left is not None:
             self.map(base.left,d+[1])
@@ -281,7 +282,7 @@ class exp:
         return self._str_aux(self.root)
 
     def _str_aux(self,base,last_operator = None):
-        op_order = {'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6,'=':7}
+        op_order = {'=':1,'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6}
 
         if base.val not in op_order:
             return str(base.val)
@@ -292,103 +293,50 @@ class exp:
         return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
 
 ### in production ###
-def invert_branch(self,var):
-		self.dir = {}
-		self.map()
+    def invert_branch(self,var,root=None,inv_tree=None, path:list=[]):
 
-		if var not in self.dir.keys():
-			raise Exception(f"({var}) not in {self.tree2exp()}")
-		
-		d = self.dir[var]
-		d = d[0]
+        if root==None:
+            root=self.root
+            if var not in self.dir:
+                raise Exception(f'\'{var}\': Not found in Expression')
+            path = self.dir[var][0] # if path is not specified takes the first path in dir
+        
+        left = path[0]  # Path towards the variable 1 if left 0 if right 
+        
+        for d in path:
+            inv_tree = self.__invert_aux(root,d,inv_tree)
+            root = root.left if d else root.right
 
-		root = self.root
-		invtree = exp()
+        inv_tree = node('=',root,inv_tree)
+        return exp(root = inv_tree)
 
+    
+    def __invert_aux(self,tree,left:int,inv_root=None):
+        operator = tree.val
 
-		for e in d:
+        # Switch case for how to invert every operation
+        if operator=='=':
+            if inv_root==None:
+                return tree.right if left else tree.left
+            else:
+                return node('=',left = inv_root,right =tree.right if left else tree.left)
 
-			if e:
-				temp = root.right # the part that branches away from the direction to the var
-				
-			else:
-				temp = root.left
-
-
-			if root.val=='+':
-				base = operator('-')
-				base.left = invtree()
-				base.right = temp
-
-				invtree.root = base
-
-			elif root.val=='-':
-				if e:
-					base = node('+',temp,invtree())
-
-					invtree.root = base
-				else:
-					base = operator('-')
-					base.right = invtree()
-					base.left = temp
-
-					invtree.root = base
-
-
-			elif root.val=='*':
-				base = operator('/')
-				base.left = invtree()
-				base.right = temp
-
-				invtree.root = base
-
-			elif root.val =='/':
-				if e:
-					base = operator('*')
-					base.right = invtree()
-					base.left = temp
-
-					invtree.root = base
-
-				else:
-					base = operator('/')
-					base.right = invtree()
-					base.left = temp
-
-					invtree.root = base
-
-			
-			elif root.val =='^':
-				if e:
-					base1 = operator('/')
-					base1.left = operand(1)
-					base1.right = temp
-
-					base = operator('^')
-					base.right = base1
-					base.left = invtree()
-					invtree.root = base
-				else:
-					raise Exception(f"Cannot evaluate '^' for '{root.val}' in ({self.tree2exp(temp)})^({self.tree2exp(root.right)})={self.tree2exp(invtree())}")
-
-			elif root.val=='=':
-				if invtree() is not None:
-					base = operator('=')
-					base.right = invtree()
-					base.left = temp
-					invtree.root = base
-
-				else:
-					invtree.root=temp
-
-
-			if e:
-				root = root.left # the path to var
-				
-			else:
-				root = root.right
-
-		return invtree
+        elif operator=='+':
+            return node('-',left = inv_root,right = tree.right if left else tree.left)
+        
+        elif operator=='-':
+            if left:
+                return node('+',left = inv_root,right = tree.right)
+            else:
+                return node('-',left = tree.left,right=inv_root)
+        
+        elif operator == '*':
+            return node('/',left = inv_root,right = tree.right if left else tree.left)
+        
+        elif '^':
+            if left:
+                pow_node = node('/',left=1,right=tree.right)
+                return node('^',left=inv_root,right=pow_node)
 
 class node:
     def __init__(self,val,left:any= None,right:any = None):
