@@ -165,6 +165,7 @@ class exp:
             right = self.evaluate(root.left)
             if right==None:
                 return self.evaluate(root.left)
+            return right
 
         left = self.evaluate(root.left)
         right = self.evaluate(root.right)
@@ -292,13 +293,13 @@ class exp:
 
         return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
 
-### in production ###
-    def invert_branch(self,var,root=None,inv_tree=None, path:list=[]):
+    def invert_branch(self,var,root=None,inv_tree=None, path:list=[],include_var:bool=False):
+        ## Used for generating symbolic algebraic solutions to equations
 
         if root==None:
             root=self.root
             if var not in self.dir:
-                raise Exception(f'\'{var}\': Not found in Expression')
+                raise Exception(f'\'{var}\' not found in Expression')
             path = self.dir[var][0] # if path is not specified takes the first path in dir
         
         left = path[0]  # Path towards the variable 1 if left 0 if right 
@@ -306,11 +307,11 @@ class exp:
         for d in path:
             inv_tree = self.__invert_aux(root,d,inv_tree)
             root = root.left if d else root.right
-
-        inv_tree = node('=',root,inv_tree)
+            
+        if include_var:
+            inv_tree = node('=',root,inv_tree)
         return exp(root = inv_tree)
 
-    
     def __invert_aux(self,tree,left:int,inv_root=None):
         operator = tree.val
 
