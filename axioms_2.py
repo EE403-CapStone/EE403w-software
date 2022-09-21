@@ -154,9 +154,12 @@ class exp:
         return exp_list
 
     def evaluate(self,root=None):
+        
         if root==None:
             root= self.root
 
+        if type(root.val)==str and root.val not in '^*/%+-=&|!':
+            return None
         # For when the root val is in this set of classes return the raw value
         if type(root.val) in [bool,int,float,float,complex]:
             return root.val
@@ -307,7 +310,7 @@ class exp:
         for d in path:
             inv_tree = self.__invert_aux(root,d,inv_tree)
             root = root.left if d else root.right
-            
+
         if include_var:
             inv_tree = node('=',root,inv_tree)
         return exp(root = inv_tree)
