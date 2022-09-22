@@ -272,7 +272,7 @@ class exp:
         if base == None:
             base = self.root
 
-        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-=&|!<=>=':
+        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-&|!<=>=':
             if base.val not in self.dir:
                 self.dir[base.val] = []
             self.dir[base.val].append(d)
