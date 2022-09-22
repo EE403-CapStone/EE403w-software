@@ -1,8 +1,8 @@
 import doctest
 
-
 class exp:
-    def __init__(self,exp=None,root=None,**kwargs):
+    def __init__(self,exp:str=None,root=None,**kwargs):
+        # str expressions and roots of trees to define expression objects
         self.root = root
 
         if isinstance(exp,str):
@@ -17,6 +17,8 @@ class exp:
         self.map()
 
     def exp2tree(self,exp,latex = False):
+        # Converts the raw string into a tree
+        # ex. list2tree('a+b')=> node(val='+', left=node('a'), right=node('b'))
         exp_list = []
 
         # check for mismatched delimiters
@@ -50,7 +52,8 @@ class exp:
         return root
 
     def _str2values(self,s:str)->any:
-        # recognize special string inputs example True False
+        # Given str inputs recognizes bool int float and complex values
+        # recognizes reserved values such as 'pi'
         if s=='True':
             return True
         elif s=='False':
@@ -93,8 +96,11 @@ class exp:
         return s
 
     def list2tree(self,op_list:list):
+        # Converts a tokenized expression to a tree
+        # list2tree(['a','+','b'])=> node(val='+', left=node('a'), right=node('b'))
+        # Handles parhentesis
 
-        while '(' in op_list:   # compresses parhentesis protected expressions
+        while '(' in op_list:           # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
 
         if len(op_list)==1:
@@ -112,28 +118,22 @@ class exp:
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
         right = self.list2tree(op_list[next_operator+1:])
-        
 
         return node(val,left,right)
     
     def next_operator(self,exp_list):
-        # Switch case of PEMDOS in reverse order
-        if '=' in exp_list:
-            return exp_list.index('=')
-        if '|' in exp_list:
-            return exp_list.index('|')
-        if '&' in exp_list:
-            return exp_list.index('&')        
-        if '+' in exp_list:
-            return exp_list.index('+')
-        if '-' in exp_list:
-            return exp_list.index('-')
-        if '/' in exp_list:
-            return exp_list.index('/')
-        if '*' in exp_list:
-            return exp_list.index('*')
-        if '^' in exp_list:
-            return exp_list.index('^')
+        # Returns the index of the macro operation
+        # 'macro operation': if left and right components of the operation are grouped by parhentesis 
+        # it wouldn't change the expression. 'a $ b' = '(a) $ (b)', where a and b are expressions and 
+        # '$' is an operator
+        # ex. 
+        # next_operator('a+b*c') => 1
+        # a+b*c = (a)+(b*c)
+
+        operator = ['=','|','&','!','+','-','%','*','/','^'] # disregarding ['<'...] operators for now
+        for op in operator:
+            if op in exp_list:
+                return exp_list.index(op)
 
     def compress_parhentesis(self,exp_list):
 
@@ -154,13 +154,17 @@ class exp:
         return exp_list
 
     def evaluate(self,root=None):
+        # Evaluates an expression tree
+        # If all the end nodes are operatable expressions returns value
+        # Else returns None
         
         if root==None:
             root= self.root
 
-        if type(root.val)==str and root.val not in '^*/%+-=&|!':
+        if type(root.val)==str and root.val not in '^*/%+-=&|!<> <= >=': # Case when root.val is a variable
             return None
-        # For when the root val is in this set of classes return the raw value
+        
+        # For when the root val type is in this set return the raw value
         if type(root.val) in [bool,int,float,float,complex]:
             return root.val
 
@@ -173,37 +177,36 @@ class exp:
         left = self.evaluate(root.left)
         right = self.evaluate(root.right)
 
-        if left==None or right==None:
+        operator = {
+            '+':lambda a,b: a+b,
+            '-':lambda a,b: a-b,
+            '/':lambda a,b: a/b,
+            '*':lambda a,b: a*b,
+            '^':lambda a,b: a**b,
+            '&':lambda a,b: a&b,
+            '|':lambda a,b: a|b,
+            '%':lambda a,b: a%b,
+            '>':lambda a,b:a>b,
+            '<':lambda a,b:a<b,
+            '>=':lambda a,b:a>=b,   # need to recognize these operators within text
+            '<=':lambda a,b:a<=b
+        }
+
+        single_operators={          # Need to recognize operators with single inputs
+            '!':lambda a:not a
+        }
+
+        if right==None:
             return None
 
-        if root.val=='+':
-            return left+right
-
-        elif root.val=='-':
-            return left-right
-
-        elif root.val=='*':
-            return left*right
-            
-        elif root.val=='^':
-            return left**right
-
-        elif root.val=='/':
-            return left/right
-
-        elif root.val=='%':
-            return left%right
-        # Need to check functionality of logic operators
-        elif root.val=='&':
-            return left and right
-        
-        elif root.val=='|':
-            return left or right
-        
-        elif root.val=='!':
-            return not root.val
+        # Operators with both left or right parts
+        if root.val in operator:
+            return operator[root.val](left,right)
+        elif root.val in single_operators:
+            return operator[root.val](right)
 
     def display(self,root=None):
+        # Purely for debugging purposes
         if root==None:
             root = self.root
         lines, *_ = self._display_aux(root)
@@ -211,6 +214,7 @@ class exp:
             print(line)
 
     def _display_aux(self,base=None):
+        # For debugging purposes
         if base == None:
             base = self.root
         
@@ -259,11 +263,16 @@ class exp:
     def solve():
         pass
 
-    def map(self,base = None,d = []): # sets the index of the variable to the value index
+    def map(self,base = None,d = []):
+        # Sets the index of the variable to the value index
+        # Returns a dict of 'variable' and [path] pairs
+        # path is an ordered list of '1/0'
+        # Going left and right for 1,0 respectfully will lead to 'variable'
+
         if base == None:
             base = self.root
 
-        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-=&|!':
+        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-=&|!<=>=':
             if base.val not in self.dir:
                 self.dir[base.val] = []
             self.dir[base.val].append(d)
@@ -275,8 +284,9 @@ class exp:
             self.map(base.right,d+[0])
 
     def __str__(self):
-        # Returns a string expression that will produce the same graph
-        # exp==exp(str(exp))
+        # Returns a string expression that is an equivalent expression to the graph
+        # str and __init__ should be rough inverses of each other
+        # 'a$b'== str(exp('a$b'))
         """
         >>> print(exp('a+b'))
         a+b
@@ -286,6 +296,9 @@ class exp:
         return self._str_aux(self.root)
 
     def _str_aux(self,base,last_operator = None):
+        # Auxillary equation of __str__
+        # Referenced locally so technical parameters are hidden that are used for recursive calls
+
         op_order = {'=':1,'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6}
 
         if base.val not in op_order:
@@ -297,7 +310,10 @@ class exp:
         return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
 
     def invert_branch(self,var,root=None,inv_tree=None, path:list=[],include_var:bool=False):
-        ## Used for generating symbolic algebraic solutions to equations
+        # Used for generating symbolic algebraic solutions to equations
+        # inverts a particular path of the tree
+        # generally used for inverting the path to a particular var
+        # 'include_var'=True if the returned tree to be expressed as 'var = inv_tree'
 
         if root==None:
             root=self.root
@@ -305,7 +321,6 @@ class exp:
                 raise Exception(f'\'{var}\' not found in Expression')
             path = self.dir[var][0] # if path is not specified takes the first path in dir
         
-        left = path[0]  # Path towards the variable 1 if left 0 if right 
         
         for d in path:
             inv_tree = self.__invert_aux(root,d,inv_tree)
@@ -316,9 +331,13 @@ class exp:
         return exp(root = inv_tree)
 
     def __invert_aux(self,tree,left:int,inv_root=None):
+        # Performs the inverse operation of a single node operation 
+        # given the left/right direction of the component that is being solved for
+        # returns a inv_tree that is the parameter inv_tree operated on by the 
+        # inv of the base.val operation
+
         operator = tree.val
 
-        # Switch case for how to invert every operation
         if operator=='=':
             if inv_root==None:
                 return tree.right if left else tree.left
@@ -343,13 +362,14 @@ class exp:
                 return node('^',left=inv_root,right=pow_node)
 
 class node:
+    # Units of expression objects
+    # Describes the structure of mathematical expressions in with 
+    # operations and left and right components
+
     def __init__(self,val,left:any= None,right:any = None):
         self.val = val
         self.right = right
         self.left = left
-
-    # def __call__(self):
-    #     return self.val
 
 
 if __name__=="__main__":
