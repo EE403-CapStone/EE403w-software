@@ -179,7 +179,7 @@ class exp:
             '<':lambda a,b:a<b,
             '>=':lambda a,b:a>=b,   # need to recognize these operators within text
             '<=':lambda a,b:a<=b,
-            '=':lambda a,b: a if a!=None else b
+            '=':lambda a,b: a if a!=None else b 
         }
 
         single_operators={          # operators with single inputs
@@ -187,6 +187,8 @@ class exp:
         }
 
         # Operators with both left or right parts
+        if root.val=='=' and None not in[left,right] and left!=right:
+            raise Exception(f'Invalid Expression\nLeft and right sides are not equal\n{self._str_aux(root.left)} !=  {self._str_aux(root.right)}')
         if root.val in operator:
             return operator[root.val](left,right)
 
