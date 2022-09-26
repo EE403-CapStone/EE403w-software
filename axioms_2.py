@@ -1,4 +1,13 @@
+# Author: Erik Huuki
+# The backend software of EE403 capstone Design project
+# Description:
+# Axioms_2 is a symbolic math library that converts mathematical statements binary trees
+# This is for the purposes of automating symbolic math operations that 
+# undergraduates frequently do
+
+
 import doctest
+import numpy as np
 
 class exp:
     def __init__(self,exp:str=None,root=None,**kwargs):
@@ -19,7 +28,7 @@ class exp:
     def exp2tree(self,exp,latex = False):
         # Converts the raw string into a tree
         # ex. list2tree('a+b')=> node(val='+', left=node('a'), right=node('b'))
-        exp_list = []
+        
 
         # check for mismatched delimiters
         if exp.count('(')!= exp.count(')'):
@@ -30,25 +39,9 @@ class exp:
         # Need to check for incomplete expressions / errors in expressions
 
         # tokenizes the string expression into a list
-        temp_var = ''
-        for val in exp:
-            # simple operators to handle in an exp
-            if val in '()^*/%+-=&|!':
-                if temp_var != '':
-                    # str to values function
-                    exp_list.append(self._str2values(temp_var))
-                    temp_var = ''
-                
-                exp_list.append(val) 
-            else:
-                temp_var+=val
-        
-        if temp_var != '':
-            exp_list.append(self._str2values(temp_var))
-
-        
+        exp_list = _tokenize(exp)
+        exp_list = [self._str2values(val) for val in exp_list]
         root = self.list2tree(exp_list)
-
         return root
 
     def _str2values(self,s:str)->any:
@@ -361,6 +354,31 @@ class exp:
                 pow_node = node('/',left=1,right=tree.right)
                 return node('^',left=inv_root,right=pow_node)
 
+
+
+def _tokenize(input_str:str)->list:
+    # Tokenize a string into a list of the macro elements of the exp
+    """
+    >>> _tokenize('a+b')
+    ['a', '+', 'b']
+    """
+
+    exp_list = []
+    temp_var = ''
+    for val in input_str:
+        # simple operators to handle in an exp
+        if val in '()^*/%+-=&|!':
+            if temp_var != '':
+                exp_list.append(temp_var)
+                temp_var = ''
+            
+            exp_list.append(val) 
+        else:
+            temp_var+=val
+    
+    exp_list+= [temp_var] if temp_var!='' else []
+    
+    return exp_list
 class node:
     # Units of expression objects
     # Describes the structure of mathematical expressions in with 
