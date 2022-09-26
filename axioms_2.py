@@ -150,27 +150,23 @@ class exp:
         # Evaluates an expression tree
         # If all the end nodes are operatable expressions returns value
         # Else returns None
+        # Assumes the expression to be valid ie. For expressions with logical statements or equivalencies
+        # it is assumed the expressions are valid
         
         if root==None:
-            root= self.root
+            root = self.root
 
         if type(root.val)==str and root.val not in '^*/%+-=&|!<> <= >=': # Case when root.val is a variable
             return None
         
-        # For when the root val type is in this set return the raw value
+        # For when the root val type is in a value set return the raw value
         if type(root.val) in [bool,int,float,float,complex]:
             return root.val
-
-        elif root.val=='=':
-            right = self.evaluate(root.left)
-            if right==None:
-                return self.evaluate(root.left)
-            return right
 
         left = self.evaluate(root.left)
         right = self.evaluate(root.right)
 
-        operator = {
+        operator = {    # Operators with 2 inputs
             '+':lambda a,b: a+b,
             '-':lambda a,b: a-b,
             '/':lambda a,b: a/b,
@@ -182,19 +178,18 @@ class exp:
             '>':lambda a,b:a>b,
             '<':lambda a,b:a<b,
             '>=':lambda a,b:a>=b,   # need to recognize these operators within text
-            '<=':lambda a,b:a<=b
+            '<=':lambda a,b:a<=b,
+            '=':lambda a,b: a if a!=None else b
         }
 
-        single_operators={          # Need to recognize operators with single inputs
+        single_operators={          # operators with single inputs
             '!':lambda a:not a
         }
-
-        if right==None:
-            return None
 
         # Operators with both left or right parts
         if root.val in operator:
             return operator[root.val](left,right)
+
         elif root.val in single_operators:
             return operator[root.val](right)
 
@@ -379,6 +374,7 @@ def _tokenize(input_str:str)->list:
     exp_list+= [temp_var] if temp_var!='' else []
     
     return exp_list
+
 class node:
     # Units of expression objects
     # Describes the structure of mathematical expressions in with 
