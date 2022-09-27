@@ -7,7 +7,7 @@
 
 
 import doctest
-import numpy as np
+# import numpy as np
 
 class exp:
     def __init__(self,exp:str=None,root=None,**kwargs):
@@ -340,15 +340,20 @@ class exp:
         elif operator=='-':
             if left:
                 return node('+',left = inv_root,right = tree.right)
-            else:
-                return node('-',left = tree.left,right=inv_root)
+            return node('-',left = tree.left,right=inv_root)
         
         elif operator == '*':
             return node('/',left = inv_root,right = tree.right if left else tree.left)
         
-        elif '^':
+        elif operator=='/':
             if left:
-                pow_node = node('/',left=1,right=tree.right)
+                return node('*',left=inv_root,right=tree.right)
+                
+            node('/',left=tree.left,right=inv_root)
+
+        elif operator == '^':
+            if left:
+                pow_node = node('/',left=node(1),right=tree.right)
                 return node('^',left=inv_root,right=pow_node)
 
 
