@@ -152,7 +152,7 @@ class exp:
             'cot',
             'asin',
             'acos',
-            'atan'] # disregarding ['<'...] operators for now
+            'atan']
 
         for op in operator:
             if op in exp_list:
