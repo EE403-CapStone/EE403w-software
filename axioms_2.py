@@ -346,6 +346,7 @@ class exp:
             'acos':6,
             'atan':6
         }
+        
         if base.val in single_op:
             return base.val+'('+self._str_aux(base.right)+')'
 
@@ -413,6 +414,11 @@ class exp:
             if left:
                 pow_node = node('/',left=node(1),right=tree.right)
                 return node('^',left=inv_root,right=pow_node)
+    
+    def _exp_classify():
+        # Classifying expressions for the purposes making decisions of how to integrate,
+        # and analyical or numerical solutions
+        pass
 
 
 
