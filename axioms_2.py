@@ -201,7 +201,8 @@ class exp:
             '<':lambda a,b:a<b,
             '>=':lambda a,b:a>=b,   # need to recognize these operators within text
             '<=':lambda a,b:a<=b,
-            '=':lambda a,b: a if a!=None else b 
+            '=':lambda a,b: a if a!=None else b,
+            '==': lambda a,b: a==b
         }
 
         single_operators={          # operators with single inputs
