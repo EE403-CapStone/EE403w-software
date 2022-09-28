@@ -6,6 +6,7 @@
 # undergraduates frequently do
 
 
+from ast import operator
 import doctest
 import numpy as np
 
@@ -107,6 +108,10 @@ class exp:
             op_list[:2] = [-1,'*',op_list[1]]
             
         next_operator = self.next_operator(op_list)
+        single_operators = ['cos','sin','tan','sec','csc','cot','asin','acos','atan','!']
+        
+        if op_list[next_operator] in single_operators:
+            return node(op_list[next_operator],right = self.list2tree(op_list[next_operator+1:]))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
@@ -123,7 +128,32 @@ class exp:
         # next_operator('a+b*c') => 1
         # a+b*c = (a)+(b*c)
 
-        operator = ['=','|','&','!','+','-','%','*','/','^'] # disregarding ['<'...] operators for now
+        operator = [
+            '=',
+            '|',
+            '&',
+            '!',
+            '+',
+            '-',
+            '%',
+            '*',
+            '/',
+            '^',
+            '==',
+            '<',
+            '<=',
+            '>',
+            '>=',
+            'cos',
+            'sin',
+            'tan',
+            'sec',
+            'csc',
+            'cot',
+            'asin',
+            'acos',
+            'atan'] # disregarding ['<'...] operators for now
+
         for op in operator:
             if op in exp_list:
                 return exp_list.index(op)
@@ -152,19 +182,11 @@ class exp:
         # Else returns None
         # Assumes the expression to be valid ie. For expressions with logical statements or equivalencies
         # it is assumed the expressions are valid
-        
         if root==None:
-            root = self.root
-
-        if type(root.val)==str and root.val not in '^*/%+-=&|!<> <= >=': # Case when root.val is a variable
-            return None
-        
+            root =self.root
         # For when the root val type is in a value set return the raw value
         if type(root.val) in [bool,int,float,float,complex]:
             return root.val
-
-        left = self.evaluate(root.left)
-        right = self.evaluate(root.right)
 
         operator = {    # Operators with 2 inputs
             '+':lambda a,b: a+b,
@@ -183,17 +205,29 @@ class exp:
         }
 
         single_operators={          # operators with single inputs
-            '!':lambda a:not a
+            '!':lambda a:not a,
+            'cos':lambda a: np.cos(a),
+            'sin':lambda a: np.sin(a),
+            'tan':lambda a: np.tan(a),
+            'sec':lambda a: np.sec(a),
+            'csc': lambda a: np.csc(a),
+            'asin': lambda a: np.asin(a),
+            'acos': lambda a: np.acos(a),
+            'atan':lambda a : np.atan(a)
         }
 
         # Operators with both left or right parts
         if root.val=='=' and None not in[left,right] and left!=right:
             raise Exception(f'Invalid Expression\nLeft and right sides are not equal\n{self._str_aux(root.left)} !=  {self._str_aux(root.right)}')
-        if root.val in operator:
-            return operator[root.val](left,right)
+        
+        
+        right = self.evaluate(root.right)
 
-        elif root.val in single_operators:
-            return operator[root.val](right)
+        if root.val in single_operators:
+            return single_operators[root.val](right)
+        elif root.val in operator:
+            left = self.evaluate(root.left)
+            return operator[root.val](left,right)
 
     def display(self,root=None):
         # Purely for debugging purposes
@@ -289,7 +323,31 @@ class exp:
         # Auxillary equation of __str__
         # Referenced locally so technical parameters are hidden that are used for recursive calls
 
-        op_order = {'=':1,'|':2,'&':3,'+':4,'-':4,'/':5,'*':5,'^':6}
+        op_order = {
+            '=':1,
+            '|':2,
+            '&':3,
+            '+':4,
+            '-':4,
+            '/':5,
+            '*':5,
+            '^':6
+            }
+
+        single_op = {
+            '!':6,
+            'sin':6,
+            'cos':6,
+            'tan':6,
+            'csc':6,
+            'sec':6,
+            'cot':6,
+            'asin':6,
+            'acos':6,
+            'atan':6
+        }
+        if base.val in single_op:
+            return base.val+'('+self._str_aux(base.right)+')'
 
         if base.val not in op_order:
             return str(base.val)
@@ -375,6 +433,8 @@ def _tokenize(input_str:str)->list:
         '/',
         '^',
         '==',
+        '|',
+        '&',
         '>',
         '>=',
         '<',
