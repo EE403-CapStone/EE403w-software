@@ -7,7 +7,7 @@
 
 
 import doctest
-# import numpy as np
+import numpy as np
 
 class exp:
     def __init__(self,exp:str=None,root=None,**kwargs):
@@ -117,8 +117,8 @@ class exp:
     def next_operator(self,exp_list):
         # Returns the index of the macro operation
         # 'macro operation': if left and right components of the operation are grouped by parhentesis 
-        # it wouldn't change the expression. 'a $ b' = '(a) $ (b)', where a and b are expressions and 
-        # '$' is an operator
+        # it wouldn't change the expression. 'a $ b' = '(a) $ (b)', where a and b are 
+        # expressions and '$' is an operator
         # ex. 
         # next_operator('a+b*c') => 1
         # a+b*c = (a)+(b*c)
@@ -348,7 +348,7 @@ class exp:
         elif operator=='/':
             if left:
                 return node('*',left=inv_root,right=tree.right)
-                
+
             node('/',left=tree.left,right=inv_root)
 
         elif operator == '^':
@@ -360,27 +360,43 @@ class exp:
 
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
+    # For each reserved command replace it with comma it and comma delimiters and finally split by commas
     """
     >>> _tokenize('a+b')
     ['a', '+', 'b']
     """
+    exp_list = [
+        '=',
+        '(',
+        ')',
+        '+',
+        '-',
+        '*',
+        '/',
+        '^',
+        '==',
+        '>',
+        '>=',
+        '<',
+        '<=',
+        '!',
+        'cos',
+        'sin',
+        'tan',
+        'sec',
+        'csc',
+        'cot',
+        'asin',
+        'acos',
+        'atan'
+    ]
+    
+    for e in exp_list:
+        input_str = input_str.replace(e,','+e+',')
+    
+    tokenize_str = [val for val in input_str.split(',') if val!='']
 
-    exp_list = []
-    temp_var = ''
-    for val in input_str:
-        # simple operators to handle in an exp
-        if val in '()^*/%+-=&|!':
-            if temp_var != '':
-                exp_list.append(temp_var)
-                temp_var = ''
-            
-            exp_list.append(val) 
-        else:
-            temp_var+=val
-    
-    exp_list+= [temp_var] if temp_var!='' else []
-    
-    return exp_list
+    return tokenize_str
 
 class node:
     # Units of expression objects
