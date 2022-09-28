@@ -26,7 +26,7 @@ class exp:
         self.dir = {}
         self.map()
 
-    def exp2tree(self,exp,latex = False):
+    def exp2tree(self,exp):
         # Converts the raw string into a tree
         # ex. list2tree('a+b')=> node(val='+', left=node('a'), right=node('b'))
         
@@ -216,17 +216,22 @@ class exp:
             'atan':lambda a : np.atan(a)
         }
 
+        if isinstance(root.val,str) and root.val not in (operator or single_operators):
+            return None
+
         # Operators with both left or right parts
         if root.val=='=' and None not in[left,right] and left!=right:
             raise Exception(f'Invalid Expression\nLeft and right sides are not equal\n{self._str_aux(root.left)} !=  {self._str_aux(root.right)}')
         
-        
         right = self.evaluate(root.right)
-
+        if right==None:
+            return None
         if root.val in single_operators:
             return single_operators[root.val](right)
         elif root.val in operator:
             left = self.evaluate(root.left)
+            if left ==None:
+                return None
             return operator[root.val](left,right)
 
     def display(self,root=None):
