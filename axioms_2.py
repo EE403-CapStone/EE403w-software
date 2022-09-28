@@ -3,7 +3,7 @@
 # Description:
 # Axioms_2 is a symbolic math library that converts mathematical statements binary trees
 # This is for the purposes of automating symbolic math operations that 
-# undergraduates frequently do
+# undergraduates and professional engineers frequent
 
 
 from ast import operator
