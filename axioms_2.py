@@ -201,8 +201,8 @@ class exp:
             '<':lambda a,b:a<b,
             '>=':lambda a,b:a>=b,   # need to recognize these operators within text
             '<=':lambda a,b:a<=b,
-            '=':lambda a,b: a if a!=None else b,
-            '==': lambda a,b: a==b
+            '==': lambda a,b: a==b,
+            '=':'some easter egg'
         }
 
         single_operators={          # operators with single inputs
@@ -217,20 +217,33 @@ class exp:
             'atan':lambda a : np.atan(a)
         }
 
-        if isinstance(root.val,str) and root.val not in (operator or single_operators):
+        if isinstance(root.val,str) and root.val not in (operator or single_operators):# not assigned variables
             return None
 
-        # Operators with both left or right parts
-        if root.val=='=' and None not in[left,right] and left!=right:
-            raise Exception(f'Invalid Expression\nLeft and right sides are not equal\n{self._str_aux(root.left)} !=  {self._str_aux(root.right)}')
-        
         right = self.evaluate(root.right)
+
+        if root.val=='=': # '=' operator requires a little more complication
+            left = self.evaluate(root.left)
+            if type(left) or type(right) in [bool,int,float,float,complex]:
+                if left==None:
+                    return right
+                elif right==None:
+                    return left
+                elif right==left:
+                    return right
+                raise Exception('Invalid expression: '+str(self)) # Both left/right can be evaluated but are different
+
+            return None # If neither left or right expresssions can be operated on
+
         if right==None:
             return None
+
         if root.val in single_operators:
             return single_operators[root.val](right)
-        elif root.val in operator:
-            left = self.evaluate(root.left)
+
+        left = self.evaluate(root.left)
+
+        if root.val in operator:
             if left ==None:
                 return None
             return operator[root.val](left,right)
