@@ -108,7 +108,7 @@ class exp:
             op_list[:2] = [-1,'*',op_list[1]]
             
         next_operator = self.next_operator(op_list)
-        single_operators = ['cos','sin','tan','sec','csc','cot','asin','acos','atan','!']
+        single_operators = ['cos','sin','tan','sec','csc','cot','asin','acos','atan','!','ln']
         
         if op_list[next_operator] in single_operators:
             return node(op_list[next_operator],right = self.list2tree(op_list[next_operator+1:]))
@@ -152,7 +152,8 @@ class exp:
             'cot',
             'asin',
             'acos',
-            'atan']
+            'atan',
+            'ln']
 
         for op in operator:
             if op in exp_list:
@@ -214,7 +215,8 @@ class exp:
             'csc': lambda a: np.csc(a),
             'asin': lambda a: np.asin(a),
             'acos': lambda a: np.acos(a),
-            'atan':lambda a : np.atan(a)
+            'atan':lambda a : np.atan(a),
+            'ln': lambda a: np.log(a)
         }
 
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# not assigned variables
@@ -363,7 +365,8 @@ class exp:
             'cot':6,
             'asin':6,
             'acos':6,
-            'atan':6
+            'atan':6,
+            'ln':6
         }
         
         if base.val in single_op:
@@ -405,6 +408,7 @@ class exp:
         # inv of the base.val operation
 
         operator = tree.val
+        # can make this a mapping of lambda functions for commutable operations and single operators
 
         if operator=='=':
             if inv_root==None:
@@ -433,6 +437,13 @@ class exp:
             if left:
                 pow_node = node('/',left=node(1),right=tree.right)
                 return node('^',left=inv_root,right=pow_node)
+            
+            num = node('ln',right=inv_root)
+            den = node('ln',right=tree.left)
+            return node('/',left=num,right= den)
+        
+        ## Inverting single operators below
+
     
     def _exp_classify():
         # Classifying expressions for the purposes making decisions of how to integrate,
@@ -473,7 +484,8 @@ def _tokenize(input_str:str)->list:
         'cot',
         'asin',
         'acos',
-        'atan'
+        'atan',
+        'ln'
     ]
     
     for e in exp_list:
