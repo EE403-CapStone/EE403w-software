@@ -1,4 +1,4 @@
-from axioms_2 import exp
+from axioms_2 import exp,node
 
 
 def isvalid(s):
@@ -8,11 +8,9 @@ def isvalid(s):
 
 # Can be more complex, for now only considering s of the form F(var=val)
 def function_form(s):
-    if s.count('(') and s.count(')')!=1:
+    if s.count('(')!=1 or s.count(')')!=1:
         return False
-    
-    
-    pass
+    return True
 
 def _str2values(s:str)->any:
     # Given str inputs recognizes bool int float and complex values
@@ -59,22 +57,21 @@ def _str2values(s:str)->any:
     return s
 
 
-
 exp_dir = {}
-
-
 
 # Command line interface loop
 while True:
     s = input('> ')
-    output = (s[-1]!=';')
-    output_string = ''
-    s = s[:-1] if output else s
 
-    # Check validity of statements according to our spec
-    if not isvalid(s):
+    if s=='':
+        continue
+    if not isvalid(s): # Check validity of statements according to our spec
         print('Invalid Statement')
         continue
+
+    output = (s[-1]!=';')
+    output_string = ''
+    s = s[:-1] if not output else s
     
     if s=='clear':
         exp_dir = {}
@@ -102,9 +99,10 @@ while True:
         for arg in var_args:
             key,val = arg.split('=')
             val_dict[key] = _str2values(val)    # Assuming val can be converted to a raw val
-
+                
         output_string = str(exp_dir[e].evaluate(val_dict=val_dict))
-    
+        exp_dir['ans'] = exp(root=node(exp_dir[e].evaluate(val_dict=val_dict)))
+
     if s=='break': # For debugging purposes
         break
     
