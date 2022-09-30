@@ -227,7 +227,6 @@ class exp:
         }
 
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
-
             if root.val in val_dict:
                 return val_dict[root.val]
             return None
