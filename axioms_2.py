@@ -95,7 +95,7 @@ class exp:
         # Handles parhentesis
 
         while '(' in op_list:           # compresses parhentesis protected expressions
-            op_list = self.compress_parhentesis(op_list)
+            op_list = self.compress_parhentesis(op_list) # NOTE this doesn't need to be a function, it is only called once
 
         if len(op_list)==1:
             if type(op_list[0])in [str,bool, int, float, complex]:
@@ -107,11 +107,18 @@ class exp:
         if op_list[0]=='-':            # case of -x
             op_list[:2] = [-1,'*',op_list[1]]
             
+        # create a node for each operator, starting with = (highest order of operations)
         next_operator = self.next_operator(op_list)
         single_operators = ['cos','sin','tan','sec','csc','cot','asin','acos','atan','!','ln']
+        pure_functions = ['invert']
         
         if op_list[next_operator] in single_operators:
             return node(op_list[next_operator],right = self.list2tree(op_list[next_operator+1:]))
+
+        # if it is a pure function, the node value is everything in the parenthesis.
+        # NOTE there may be a bug here which has to do with garbage in the arguments.
+        if op_list[next_operator] in pure_functions:
+            return node(op_list[next_operator], right = self.list2tree(op_list[next_operator+1:]))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
@@ -153,7 +160,9 @@ class exp:
             'asin',
             'acos',
             'atan',
-            'ln']
+            'ln',
+            'invert'
+        ]
 
         for op in operator:
             if op in exp_list:
@@ -219,6 +228,22 @@ class exp:
             'ln': lambda a: np.log(a)
         }
 
+        # inverts the specified expression (found in the environment) in terms
+        # of the specified variable.
+        #
+        # argv[0]: expression
+        # argv[1]: valiable
+        # TODO
+        def evaluate_invert(argv:str):
+            pass
+
+        # functions which may require multiple parameters and return an expression object
+        # all functions are passed argv, which is a list contianing the arguments specified between the
+        # parenthesis
+        pure_functions = {
+            'invert': evaluate_invert,
+        }
+
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# not assigned variables
             return None
 
@@ -249,6 +274,10 @@ class exp:
             if left ==None:
                 return None
             return operator[root.val](left,right)
+
+
+        if root.val in pure_functions:
+            pass
 
     def display(self,root=None):
         # Purely for debugging purposes
@@ -317,7 +346,8 @@ class exp:
         if base == None:
             base = self.root
 
-        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-&|!<=>=':
+        # BUG single operand commands are marked as variables
+        if type(base.val) not in [bool,int,complex,float,list] and base.val not in '^*/%+-&|!<=>=':
             if base.val not in self.dir:
                 self.dir[base.val] = []
             self.dir[base.val].append(d)
@@ -454,7 +484,7 @@ class exp:
 
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
-    # For each reserved command replace it with comma it and comma delimiters and finally split by commas
+    # For each reserved command, surround it with delimeters, then split by commas
     """
     >>> _tokenize('a+b')
     ['a', '+', 'b']
@@ -485,13 +515,17 @@ def _tokenize(input_str:str)->list:
         'asin',
         'acos',
         'atan',
-        'ln'
+        'ln',
+
+        'invert'
     ]
-    
+
+    delimeter = '\x01' # ascii SOH (start of heading), not on keyboard.
+
     for e in exp_list:
-        input_str = input_str.replace(e,','+e+',')
+        input_str = input_str.replace(e, delimeter+e+delimeter)
     
-    tokenize_str = [val for val in input_str.split(',') if val!='']
+    tokenize_str = [val for val in input_str.split(delimeter) if val!='']
 
     return tokenize_str
 
