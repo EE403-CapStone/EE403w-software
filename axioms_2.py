@@ -177,12 +177,19 @@ class exp:
         exp_list[p1:p2+1] = [[exp_list[p1+1:p2]]]
         return exp_list
 
-    def evaluate(self,root=None):
+    def evaluate(self,root=None,val_dict:dict={}):
         # Evaluates an expression tree
         # If all the end nodes are operatable expressions returns value
         # Else returns None
         # Assumes the expression to be valid ie. For expressions with logical statements or equivalencies
         # it is assumed the expressions are valid
+
+        '''
+        >>> a = exp('a+b')
+        >>> a.evaluate(val_dict={'a':1,'b':2})
+        3
+        '''
+
         if root==None:
             root =self.root
         # For when the root val type is in a value set return the raw value
@@ -219,13 +226,16 @@ class exp:
             'ln': lambda a: np.log(a)
         }
 
-        if isinstance(root.val,str) and root.val not in (operator or single_operators):# not assigned variables
+        if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
+
+            if root.val in val_dict:
+                return val_dict[root.val]
             return None
 
-        right = self.evaluate(root.right)
+        right = self.evaluate(root.right,val_dict=val_dict)
 
         if root.val=='=': # '=' operator requires a little more complication
-            left = self.evaluate(root.left)
+            left = self.evaluate(root.left, val_dict=val_dict)
             if type(left) or type(right) in [bool,int,float,float,complex]:
                 if left==None:
                     return right
@@ -243,7 +253,7 @@ class exp:
         if root.val in single_operators:
             return single_operators[root.val](right)
 
-        left = self.evaluate(root.left)
+        left = self.evaluate(root.left, val_dict=val_dict)
 
         if root.val in operator:
             if left ==None:
