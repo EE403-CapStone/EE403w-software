@@ -210,7 +210,7 @@ class exp:
             '>=':lambda a,b:a>=b,   # need to recognize these operators within text
             '<=':lambda a,b:a<=b,
             '==': lambda a,b: a==b,
-            '=':'some easter egg'
+            '=': 'I enjoy this stuff, please hire me lol'
         }
 
         single_operators={          # operators with single inputs
@@ -419,6 +419,7 @@ class exp:
         operator = tree.val
         # can make this a mapping of lambda functions for commutable operations and single operators
 
+        # Double operations that are non commutable
         if operator=='=':
             if inv_root==None:
                 return tree.right if left else tree.left
