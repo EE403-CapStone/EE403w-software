@@ -116,9 +116,21 @@ class exp:
             return node(op_list[next_operator],right = self.list2tree(op_list[next_operator+1:]))
 
         # if it is a pure function, the node value is everything in the parenthesis.
-        # NOTE there may be a bug here which has to do with garbage in the arguments.
         if op_list[next_operator] in pure_functions:
-            return node(op_list[next_operator], right = self.list2tree(op_list[next_operator+1:]))
+            # NOTE this only works because pure functions are at the bottom of the order
+            # of operations. there could be issues if there are more pure functions
+            # which are right next to each other.
+            #
+            # when right val is determined, the only thing left in op_list is the contents of the
+            # parentheses.
+            right_val = self.list2tree(op_list[next_operator+1:]).val
+
+            # pure functions take a list of arguments as input. remove whitespace then
+            # split by commas to get the parameters.
+            right_val = right_val.replace(' ', '')
+            right_val = right_val.split(',')
+
+            return node(op_list[next_operator], right = node(val=right_val))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
@@ -232,14 +244,14 @@ class exp:
         # of the specified variable.
         #
         # argv[0]: expression
-        # argv[1]: valiable
+        # argv[1]: variable
         # TODO
-        def evaluate_invert(argv:str):
+        def evaluate_invert(argv:list):
             pass
 
-        # functions which may require multiple parameters and return an expression object
-        # all functions are passed argv, which is a list contianing the arguments specified between the
-        # parenthesis
+        # functions which may require multiple parameters and return their own expression trees which
+        # need to be spliced into the current tree all functions are passed argv, which is a list
+        # contianing the arguments specified between the parenthesis
         pure_functions = {
             'invert': evaluate_invert,
         }
