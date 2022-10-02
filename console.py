@@ -78,6 +78,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.command_buffer = [] # list of commands which still need to be processed
 
+
         # history output. FIXME text is vertically aligned at top of frame
         # TODO add label widget next to line entry widget
         self.output_hist = QtWidgets.QTextEdit('')
@@ -133,6 +134,10 @@ a valid command, then it is assumed that the user input are paremeters for set_e
 if __name__ == "__main__":
     #setup QT6 context
     app = QtWidgets.QApplication([])
+
+    monofont = QtGui.QFont("Monospace", 13)
+    app.setFont(monofont, "QLineEdit")
+    app.setFont(monofont, "QTextEdit")
 
     widget = MainWindow()
     widget.resize(800, 600)
