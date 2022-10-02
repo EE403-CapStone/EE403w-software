@@ -460,7 +460,7 @@ class exp:
         # and analyical or numerical solutions
         pass
 
-    def replace(self,var:str, root:node):
+    def replace(self,var:str, root):
         for path in self.dir[var]:
             temp = self.root
             for left in path:
