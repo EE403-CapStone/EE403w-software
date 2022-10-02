@@ -210,7 +210,7 @@ class exp:
             '>=':lambda a,b:a>=b,   # need to recognize these operators within text
             '<=':lambda a,b:a<=b,
             '==': lambda a,b: a==b,
-            '=': 'I enjoy this stuff, please hire me lol'
+            '=': 'Easter Egg'
         }
 
         single_operators={          # operators with single inputs
@@ -460,7 +460,12 @@ class exp:
         # and analyical or numerical solutions
         pass
 
-
+    def replace(self,var:str, root:node):
+        for path in self.dir[var]:
+            temp = self.root
+            for left in path:
+                temp = temp.left if left else temp.right
+            temp = root
 
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
