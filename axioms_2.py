@@ -23,6 +23,7 @@ class exp:
         
         if 'exp' in kwargs:
             self.root = self.exp2tree(kwargs['exp'])
+        
         self.dir = {}
         self.map()
 
@@ -93,10 +94,10 @@ class exp:
         # Converts a tokenized expression to a tree
         # list2tree(['a','+','b'])=> node(val='+', left=node('a'), right=node('b'))
         # Handles parhentesis
-
+        
         while '(' in op_list:           # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
-
+        
         if len(op_list)==1:
             if type(op_list[0])in [str,bool, int, float, complex]:
                 return node(op_list[0])
@@ -104,14 +105,13 @@ class exp:
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
+        elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):
+            return node(op_list[0],right = self.list2tree(op_list[1]))
+        
         if op_list[0]=='-':            # case of -x
             op_list[:2] = [-1,'*',op_list[1]]
             
         next_operator = self.next_operator(op_list)
-        single_operators = ['cos','sin','tan','sec','csc','cot','asin','acos','atan','!','ln']
-        
-        if op_list[next_operator] in single_operators:
-            return node(op_list[next_operator],right = self.list2tree(op_list[next_operator+1:]))
 
         val = op_list[next_operator]
         left = self.list2tree(op_list[:next_operator])
@@ -269,8 +269,6 @@ class exp:
 
     def _display_aux(self,base=None):
         # For debugging purposes
-        if base == None:
-            base = self.root
         
         if base.right== None and base.left==None:
             line = '%s' % base.val
@@ -279,20 +277,20 @@ class exp:
             middle = width // 2
             return [line], width, height, middle
 
-        # Only left child.
-        if base.right == None:
-            lines, n, p, x = self._display_aux(base.left)
-            s = '%s' % base.val
-            u = len(s)
-            first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s
-            second_line = x * ' ' + '/' + (n - x - 1 + u) * ' '
-            shifted_lines = [line + u * ' ' for line in lines]
-            return [first_line, second_line] + shifted_lines, n + u, p + 2, n + u // 2
+        # # Only left child.
+        # if base.right == None:
+        #     lines, n, p, x = self._display_aux(base.left)
+        #     s = '%s' % base.val
+        #     u = len(s)
+        #     first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s
+        #     second_line = x * ' ' + '/' + (n - x - 1 + u) * ' '
+        #     shifted_lines = [line + u * ' ' for line in lines]
+        #     return [first_line, second_line] + shifted_lines, n + u, p + 2, n + u // 2
 
         # Only right child.
         if base.left == None:
             lines, n, p, x = self._display_aux(base.right)
-            s = '%s' % base.right
+            s = '%s' % base.val
             u = len(s)
             first_line = s + x * '_' + (n - x) * ' '
             second_line = (u + x) * ' ' + '\\' + (n - x - 1) * ' '
