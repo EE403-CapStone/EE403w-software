@@ -277,15 +277,15 @@ class exp:
             middle = width // 2
             return [line], width, height, middle
 
-        # # Only left child.
-        # if base.right == None:
-        #     lines, n, p, x = self._display_aux(base.left)
-        #     s = '%s' % base.val
-        #     u = len(s)
-        #     first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s
-        #     second_line = x * ' ' + '/' + (n - x - 1 + u) * ' '
-        #     shifted_lines = [line + u * ' ' for line in lines]
-        #     return [first_line, second_line] + shifted_lines, n + u, p + 2, n + u // 2
+        # Only left child.
+        if base.right == None:
+            lines, n, p, x = self._display_aux(base.left)
+            s = '%s' % base.val
+            u = len(s)
+            first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s
+            second_line = x * ' ' + '/' + (n - x - 1 + u) * ' '
+            shifted_lines = [line + u * ' ' for line in lines]
+            return [first_line, second_line] + shifted_lines, n + u, p + 2, n + u // 2
 
         # Only right child.
         if base.left == None:
