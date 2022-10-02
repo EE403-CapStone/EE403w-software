@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from axioms_2 import exp
 import sys
-import random
 from PySide6 import QtCore, QtWidgets, QtGui
+import command_line
 """
 returns the arguments of cmd_string
 """
@@ -12,7 +12,6 @@ def trim_command(cmd_string):
 
     n = cmd_string.find(' ')
     return cmd_string[n+1:]
-
 
 
 """
@@ -31,11 +30,20 @@ class State:
         self.command_buffer = [] # commands which need to be processed
         self.output_buffer = [] # lines which need to be printed to the screen
 
-    # TODO this doesn't parse the expression, and includes the command keyword in cmd
-    def set_expr(self, cmd):
-        n = trim_command(cmd)
-        self.expressions['ans'] = exp(n)
-        self.print('ans: ' +  str(self.expressions['ans']))
+    # argv[0]: :
+    # argv[1]: expression symbol (ex. 'ans')
+    # argv[2]: expression value (ex. 'x+y=2')
+    def set_expr_callback(self, argv):
+        print(argv)
+        if argv[1] == '':
+            argv[1] = 'ans'
+
+        # TODO you need to mirror axioms code here to parse and interpret
+        #  functions such as invert.
+        expression = exp(argv[2])
+        self.expressions[argv[1]] = expression
+
+        return('    ' + argv[1] + ' <- ' +  str(self.expressions[argv[1]]))
 
     def exit_prog(self, cmd):
         self.exit_prog = True
@@ -53,7 +61,7 @@ class State:
         if cmd is None:
             return
 
-        tokens = cmd.split(' ')
+        argv = cmd.split(' ')
 
         # these are the bindings between the state modifier functions and the
         # commands that the user can actually type
@@ -65,18 +73,26 @@ class State:
         # TODO create a new commmand class which includes documentation for each command
         commands = {
             "exit": State.exit_prog,
-            "set_expr": State.set_expr,
+            ":": State.set_expr_callback,
             "list": State.list_exprs,
-            "help": lambda state, cmd : self.print(list(commands.keys()))
+            "help": lambda state, argv : self.print(list(commands.keys()))
         }
 
-        # after the command is evaluated any changes in state are reflected
-        # in the user interface.
-        if tokens[0] in commands:
-            commands[tokens[0]](self, cmd)
-        else:
-            self.print('"' + tokens[0] + '" is not a recognized command or script.')
+        # check if this is the colon notation for set_expr
+        if argv[0][-1] == ':':
+            # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
+            argv.insert(1, argv[0][:-1])
+            argv[0] = ':'
 
+        # in the user interface.
+        # TODO make commands return text to print to input buffer instead of just
+        # printing it themself.
+        #
+        # supress output when semicolon is present at end of line
+        if argv[0] in commands:
+            commands[argv[0]](self, argv)
+        else:
+            self.print('"' + argv[0] + '" is not a recognized command or script.')
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -127,7 +143,8 @@ there are certain commands which are supported, and a valid command must be used
 for an operation to be valid.
 
 list of valid commands:
-    - set_expr EXPRESSION
+    - set_expression Name EXPRESSION
+        - Name: Expression (set_expression colon operator)
     - load FILE
     - eval EXPRESSION
     - clear
