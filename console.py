@@ -3,6 +3,7 @@ from axioms_2 import exp
 import sys
 from PySide6 import QtCore, QtWidgets, QtGui
 import command_line
+from command_line import Command
 """
 returns the arguments of cmd_string
 """
@@ -30,27 +31,7 @@ class State:
         self.command_buffer = [] # commands which need to be processed
         self.output_buffer = [] # lines which need to be printed to the screen
 
-    # argv[0]: :
-    # argv[1]: expression symbol (ex. 'ans')
-    # argv[2]: expression value (ex. 'x+y=2')
-    def set_expr_callback(self, argv):
-        print(argv)
-        if argv[1] == '':
-            argv[1] = 'ans'
-
-        # TODO you need to mirror axioms code here to parse and interpret
-        #  functions such as invert.
-        expression = exp(argv[2])
-        self.expressions[argv[1]] = expression
-
-        return('    ' + argv[1] + ' <- ' +  str(self.expressions[argv[1]]))
-
-    def exit_prog(self, cmd):
-        self.exit_prog = True
-
-    def list_exprs(self, cmd):
-        for k,e in self.expressions.items():
-            self.print(str(k) + ': ' + str(e))
+        Command.state = self
 
     def print(self, txt):
         self.output_buffer.append(str(txt))
@@ -61,22 +42,15 @@ class State:
         if cmd is None:
             return
 
+        # determine if output should be supressed
+        suppress_output = False
+        if cmd[-1] == ';':
+            suppress_output = True
+            cmd = cmd[:-1]
+
         argv = cmd.split(' ')
 
-        # these are the bindings between the state modifier functions and the
-        # commands that the user can actually type
-        #
-        # Commands are standardized in that they only take the command line string.
-        # each function is responsible for parsing the input itself.
-        #
         # TODO the implied set_expr is not implemented yet.
-        # TODO create a new commmand class which includes documentation for each command
-        commands = {
-            "exit": State.exit_prog,
-            ":": State.set_expr_callback,
-            "list": State.list_exprs,
-            "help": lambda state, argv : self.print(list(commands.keys()))
-        }
 
         # check if this is the colon notation for set_expr
         if argv[0][-1] == ':':
@@ -84,15 +58,17 @@ class State:
             argv.insert(1, argv[0][:-1])
             argv[0] = ':'
 
-        # in the user interface.
-        # TODO make commands return text to print to input buffer instead of just
-        # printing it themself.
-        #
-        # supress output when semicolon is present at end of line
-        if argv[0] in commands:
-            commands[argv[0]](self, argv)
+        output = ''
+        if argv[0] in Command.commands:
+            output = Command.commands[argv[0]].callback(argv)
         else:
-            self.print('"' + argv[0] + '" is not a recognized command or script.')
+            output = ('"' + argv[0] + '" is not a recognized command or script.')
+
+        # don't print if there was a semicolon at the end of the input
+        if suppress_output:
+            return
+        else:
+            self.print(output)
 
 
 class MainWindow(QtWidgets.QWidget):
