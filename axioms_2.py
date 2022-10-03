@@ -452,6 +452,7 @@ class exp:
             den = node('ln',right=tree.left)
             return node('/',left=num,right= den)
         
+        
         ## Inverting single operators below
         # expressions of the form f(f(x))=a
         # maps inversion step to get f(x) = f^-1(a)
@@ -461,6 +462,7 @@ class exp:
             'cos':lambda a:node('acos',right=a),
             'tan':lambda a:node('atan',right=a),
             'ln':lambda a:node('exp',right=a),
+            'exp':lambda a:node('ln',right = a),
             '!':lambda a:node('!',right=a),
             'csc':lambda a:node('asin',right=node('/',node(1),a)),
             'sec':lambda a:node('acos',right=node('/',node(1),a)),
