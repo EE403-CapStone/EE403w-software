@@ -1,4 +1,5 @@
-from axioms_2 import exp,node
+from axioms_2 import exp as ExpBase
+from axioms_2 import node
 
 """
 Command Line
@@ -29,6 +30,8 @@ class Command:
     # THIS MUST BE SET
     state = None
 
+    # TODO change help_str into a dictionary of sections and section text. example:
+    #  {'Description': 'Default Description', 'Usage': 'Default Usage'}
     def __init__(self, cmd_str:str, help_str:str, callback=None):
         self.cmd_str = cmd_str
         self.help_str = help_str
@@ -45,7 +48,7 @@ class Command:
 class _set_expr(Command):
     def __init__(self):
         cmd_str = "setexpr"
-        help_str = "help page for setexpr.\nDescription: binds an expression to an expression object\nUsage: setexpr EXP_NAME EXPRESSION"
+        help_str = "Description: binds an expression to an expression object\nUsage: setexpr EXP_NAME EXPRESSION"
 
         super().__init__(cmd_str, help_str, _set_expr.callback)
 
@@ -55,14 +58,25 @@ class _set_expr(Command):
     # argv[0]: : or setexpr
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
-    def callback(argv:list):
+    def callback(argv:list) -> str:
         # BUG argv[1] may not exist
         if argv[1] == '':
             argv[1] = 'ans'
 
-        # TODO you need to mirror axioms code here to parse and interpret
-        #  functions such as invert.
-        expression = exp(argv[2])
+        exp_str = ''
+        for e in argv[2:]:
+            exp_str += e
+
+        print('argv:', argv)
+
+        print('expr_str:', exp_str)
+
+        expression = Exp(exp_str)
+        print('str(expr):', expression)
+
+        expression.display()
+        print()
+
         Command.state.expressions[argv[1]] = expression
 
         return('    ' + argv[1] + ' <- ' +  str(Command.state.expressions[argv[1]]))
@@ -70,11 +84,11 @@ class _set_expr(Command):
 class _list_expr(Command):
     def __init__(self):
         cmd_str = "list"
-        help_str = "help page for list.\nDescription: displays currently defined expressions\nUsage: list"
+        help_str = "Description: displays currently defined expressions\nUsage: list"
 
         super().__init__(cmd_str, help_str, _list_expr.callback)
 
-    def callback(argv:list):
+    def callback(argv:list) -> str:
         output = ''
         for k,e in Command.state.expressions.items():
             output += str(k) + ': ' + str(e) + '\n'
@@ -84,14 +98,13 @@ class _list_expr(Command):
 class _help(Command):
     def __init__(self):
         cmd_str = "help"
-        help_str = "help page for help.\nDescripton: displays help text for a given command\nUsage: help COMMAND\n       help all #to display all commands"
+        help_str = "Descripton: displays help text for a given command\nUsage: help COMMAND\n       help all #to display all commands"
 
         super().__init__(cmd_str, help_str, _help.callback)
 
     # argv[0]: help
     # argv[1]: COMMAND
-    def callback(argv:list):
-        print('cmd_line.py', argv)
+    def callback(argv:list) -> str:
         output = ''
         if len(argv) == 1:
             output = Command.commands['help'].help()
@@ -102,31 +115,146 @@ class _help(Command):
             output += '\nuse "help COMMAND" to get details on a specific command'
         else:
             if argv[1] in Command.commands:
+                output += 'help page for "' + argv[1] + '"\n'
                 output += Command.commands[argv[1]].help()
             else:
                 output += 'the command "' + argv[1] + '" is not a valid command'
+
+        # add some indentation for more readability
+        output = '    ' + output.replace('\n', '\n    ')
 
         return output
 
 class _exit(Command):
     def __init__(self):
         cmd_str = "exit"
-        help_str = "help page for exit.\nDescripton: exits calculator program\nUsage: exit"
+        help_str = "Descripton: exits calculator program\nUsage: exit"
 
         super().__init__(cmd_str, help_str, _exit.callback)
 
     # argv[0]: exit
-    def callback(argv:list):
+    def callback(argv:list) -> str:
         Command.state.exit_prog = True
-            
+
+class _eval(Command):
+    def __init__(self):
+        cmd_str = "eval"
+        help_str = "Descripton: Evaluates expression (functions, numerica values, etc.)\nUsage: eval EXPRESSION"
+
+        super().__init__(cmd_str, help_str, _eval.callback)
+
+    # argv[0]: eval
+    # argv[1]: EXPRESSION
+    def callback(argv:list) -> str:
+        # TODO add the ability to parse an expression or expression reference
+        if argv[1] not in Command.state.expressions:
+            return '    ERROR: expression "' + argv[1] + '" is not defined.'
+
+        exp = Command.state.expressions[argv[1]]
+        print('exp before evaluation:', exp)
+
+        exp.evaluate_funcs(env=Command.state.expressions)
+        print('exp after evaluation (funcs):', exp)
+
+        # XXX probably don't need to fix the variables twice.
+        # fix the variables
+        exp.dir.clear()
+        exp.map()
+
+        exp.evaluate()
+        print('exp after evaluation (reg):', exp)
+
+        # fix the variables
+        exp.dir.clear()
+        exp.map()
+
+        return '    ' + argv[1] + ' <- ' + str(exp)
+
 # register predefined commands.
 _set_expr()
 _list_expr()
 _help()
 _exit()
+_eval()
 
 ################################################
-# TODO integrate Erik's code into setexpr
+class ExpFunctionError(Exception):
+    def __init__(self, function, detail):
+        message = ': error in ' + function + ' :: ' + detail
+        super().__init__(message)
+
+
+class Exp(ExpBase):
+    # these callbacks are static functions within this class.
+    #  they could probably be moved into something similar
+    #  CLI commands Command class. that would likely be a more
+    #  robust solution
+
+    def __init__(self, txt:str=None, root=None):
+        # HACK Axioms recognizes arbitrary functions with a single argument.
+        # HACK  unfortunately, commas cannot be used as delimeters, as they are
+        # HACK  used internally by the tokenizer.
+        # HACK
+        # HACK The workaround for this is to replace all commas with a 'top-comma'
+        # HACK  (ie, grave)
+        formatted_txt = None
+        if txt != None:
+            formatted_txt = txt.replace(',','`')
+
+        super().__init__(formatted_txt, root)
+
+    '''
+    looks for arbitrary functions in the expression tree.
+
+    if a match is found, it is evaluated, and its result is
+    spliced into the tree.
+    '''
+    def evaluate_funcs(self, root=None, env:dict=None):
+        if root == None:
+            root = self.root
+
+        if root.val in Exp.funcs:
+            argv = root.right.val.split('`') # split at grave, because hack.
+            expr = Exp.funcs[root.val](argv, env)
+
+            # splice in the root of the new expression at this node.
+            root.val = expr.root.val
+            root.left = expr.root.left
+            root.right = expr.root.right # we can forget about the function arguments
+
+            # the new expression that was spliced in may have arbitrary functions
+            # as well. better evaluate_funcs() on them too.
+            if root.left != None:
+                self.evaluate_funcs(root.left, env)
+            if root.right != None:
+                self.evaluate_funcs(root.right, env)
+
+        else:
+            if root.left != None:
+                self.evaluate_funcs(root.left, env)
+            if root.right != None:
+                self.evaluate_funcs(root.right, env)
+
+
+    # argv[0]: EXPRESSION (from CLI namespace)
+    # argv[1]: VARIABLE (from expression in argv[0])
+    def _evaluate_invert(argv:list, env:dict):
+        if argv[0] not in env:
+            raise ExpFunctionError('invert', 'expression "' + argv[0] + '" does not exist.')
+
+        # NOTE may raise "var not found in Expression" exception
+        inverted_exp = env[argv[0]].invert_branch(argv[1]) # is of type ExpBase
+
+        return Exp(root=inverted_exp.root)
+
+    # these callbacks must be of the form
+    #  callback(argv:list, env:dict) -> Exp
+    funcs = {
+        'invert': _evaluate_invert,
+        'dummy': lambda : NotImplemented
+    }
+
+################################################
 def isvalid(s):
     # Statements that check if statements are able to be processed
     return True
