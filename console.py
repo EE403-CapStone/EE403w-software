@@ -53,6 +53,8 @@ class State:
         # TODO the implied set_expr is not implemented yet.
 
         # check if this is the colon notation for set_expr
+        # BUG if someone enters ':: some_expr' then weird things happen
+        # BUG if someone enters 'A:some_expr' it is not recognized as an expression
         if argv[0][-1] == ':':
             # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
             argv.insert(1, argv[0][:-1])
@@ -78,7 +80,6 @@ class MainWindow(QtWidgets.QWidget):
 
         self.command_buffer = [] # list of commands which still need to be processed
 
-
         # history output. FIXME text is vertically aligned at top of frame
         # TODO add label widget next to line entry widget
         self.output_hist = QtWidgets.QTextEdit('')
@@ -91,12 +92,25 @@ for a list of available commands, type 'help'
         self.output_hist.setReadOnly(True)
 
         self.cmd_input = QtWidgets.QLineEdit()
+        self.environment_list = QtWidgets.QListWidget()
 
+        # create main layout, QWindow (I think) is its parent
         self.layout = QtWidgets.QVBoxLayout(self)
-        self.layout.addWidget(self.output_hist)
+
+        self.hlayout = QtWidgets.QHBoxLayout()
+        self.hlayout.addWidget(self.output_hist, stretch=10)
+        self.hlayout.addWidget(self.environment_list)
+
+        self.layout.addLayout(self.hlayout)
         self.layout.addWidget(self.cmd_input)
 
+        # connect signals/slots
         self.cmd_input.returnPressed.connect(self.on_enter)
+
+        # load icons
+        self.expression_list_icon = QtGui.QIcon()
+        self.expression_list_icon.addFile("icons/expression_list_item.png")
+
 
     @QtCore.Slot()
     def on_enter(self):
@@ -112,6 +126,17 @@ for a list of available commands, type 'help'
         self.state.output_buffer.clear()
         self.state.output_buffer.append('') # add a blank line for formatting
 
+        # update the list view
+        self.environment_list.clear()
+
+        for e in self.state.expressions:
+            label = e + ': ' + str(self.state.expressions[e])
+
+            item = QtWidgets.QListWidgetItem()
+            item.setIcon(self.expression_list_icon)
+            item.setText(label)
+
+            self.environment_list.addItem(item)
 
 
 """
@@ -136,8 +161,7 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication([])
 
     monofont = QtGui.QFont("Monospace", 13)
-    app.setFont(monofont, "QLineEdit")
-    app.setFont(monofont, "QTextEdit")
+    app.setFont(monofont)
 
     widget = MainWindow()
     widget.resize(800, 600)
