@@ -220,10 +220,11 @@ class exp:
             'tan':lambda a: np.tan(a),
             'sec':lambda a: np.sec(a),
             'csc': lambda a: np.csc(a),
-            'asin': lambda a: np.asin(a),
-            'acos': lambda a: np.acos(a),
-            'atan':lambda a : np.atan(a),
-            'ln': lambda a: np.log(a)
+            'asin': lambda a: np.arcsin(a),
+            'acos': lambda a: np.arccos(a),
+            'atan':lambda a : np.arctan(a),
+            'ln': lambda a: np.log(a),
+            'exp': lambda a:np.exp(a)
         }
 
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
@@ -373,7 +374,8 @@ class exp:
             'asin':6,
             'acos':6,
             'atan':6,
-            'ln':6
+            'ln':6,
+            'exp':6
         }
         
         if base.val in single_op:
@@ -451,6 +453,22 @@ class exp:
             return node('/',left=num,right= den)
         
         ## Inverting single operators below
+        # expressions of the form f(f(x))=a
+        # maps inversion step to get f(x) = f^-1(a)
+
+        inv_map = {
+            'sin':lambda a:node('asin',right=a),
+            'cos':lambda a:node('acos',right=a),
+            'tan':lambda a:node('atan',right=a),
+            'ln':lambda a:node('exp',right=a),
+            '!':lambda a:node('!',right=a),
+            'csc':lambda a:node('asin',right=node('/',node(1),a)),
+            'sec':lambda a:node('acos',right=node('/',node(1),a)),
+            'cot':lambda a:node('atan',right=node('/',node(1),a))
+        }
+
+        if operator in inv_map:
+            return inv_map[operator](inv_root)
 
     
     def _exp_classify():
