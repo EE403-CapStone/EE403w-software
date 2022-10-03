@@ -67,15 +67,7 @@ class _set_expr(Command):
         for e in argv[2:]:
             exp_str += e
 
-        print('argv:', argv)
-
-        print('expr_str:', exp_str)
-
         expression = Exp(exp_str)
-        print('str(expr):', expression)
-
-        expression.display()
-        print()
 
         Command.state.expressions[argv[1]] = expression
 
@@ -151,10 +143,8 @@ class _eval(Command):
             return '    ERROR: expression "' + argv[1] + '" is not defined.'
 
         exp = Command.state.expressions[argv[1]]
-        print('exp before evaluation:', exp)
 
         exp.evaluate_funcs(env=Command.state.expressions)
-        print('exp after evaluation (funcs):', exp)
 
         # XXX probably don't need to fix the variables twice.
         # fix the variables
@@ -162,7 +152,6 @@ class _eval(Command):
         exp.map()
 
         exp.evaluate()
-        print('exp after evaluation (reg):', exp)
 
         # fix the variables
         exp.dir.clear()
