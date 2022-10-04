@@ -6,7 +6,7 @@
 # undergraduates and professional engineers frequent
 
 
-from ast import operator
+from ast import Pass, operator
 import doctest
 import numpy as np
 
@@ -94,6 +94,19 @@ class exp:
         # Converts a tokenized expression to a tree
         # list2tree(['a','+','b'])=> node(val='+', left=node('a'), right=node('b'))
         # Handles parhentesis
+        single_arg_operators = [
+            'sin',
+            'cos',
+            'tan',
+            'csc',
+            'sec',
+            'cot',
+            'asin',
+            'acos',
+            'atan',
+            '!',
+            'exp'
+            ]
         
         while '(' in op_list:           # compresses parhentesis protected expressions
             op_list = self.compress_parhentesis(op_list)
@@ -105,8 +118,11 @@ class exp:
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
+        elif len(op_list)==2 and isinstance(op_list[0],str) and op_list[0] in single_arg_operators:
+            return node(op_list[0],right=self.list2tree(op_list[1]))
+            
         elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):
-            return node(op_list[0],right = self.list2tree(op_list[1]))
+            return node(op_list[0],right = node(''.join(op_list[1])))
         
         if op_list[0]=='-':            # case of -x
             op_list[:2] = [-1,'*',op_list[1]]
@@ -472,6 +488,38 @@ class exp:
         if operator in inv_map:
             return inv_map[operator](inv_root)
 
+    def partial_D(self,var,root = None):
+        # a is a node object with left and right components
+        d_map = {
+            '+':lambda a: node('+',self.partial_D(var,root.left),self.partial_D(var,root.right)),
+            '-':None,
+            '*':None,
+            '/':None,
+            '^':None,
+            'sin':None,
+            'cos':None,
+            'tan':None,
+            'csc':None,
+            'sec':None,
+            'tan':None,
+            'cot':None,
+            'asin':None,
+            'acos':None,
+            'atan':None
+        }
+
+        if root==None:
+            root = self.root
+
+        if root.val==var:
+            return node(1)
+        
+        elif root.val not in d_map:
+            return node(0)
+        
+        
+        if isinstance(root.val,str) and root.val not in []:
+            pass
     
     def _exp_classify():
         # Classifying expressions for the purposes making decisions of how to integrate,
@@ -492,6 +540,7 @@ def _tokenize(input_str:str)->list:
     >>> _tokenize('a+b')
     ['a', '+', 'b']
     """
+    delimiter = ' '
     exp_list = [
         '=',
         '(',
@@ -518,13 +567,13 @@ def _tokenize(input_str:str)->list:
         'asin',
         'acos',
         'atan',
-        'ln'
+        'ln',
+        ','
     ]
-    
     for e in exp_list:
-        input_str = input_str.replace(e,','+e+',')
+        input_str = input_str.replace(e,' '+e+' ')
     
-    tokenize_str = [val for val in input_str.split(',') if val!='']
+    tokenize_str = [val for val in input_str.split(' ') if val!='']
 
     return tokenize_str
 
