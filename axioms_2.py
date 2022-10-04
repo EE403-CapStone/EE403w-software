@@ -119,10 +119,10 @@ class exp:
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
-        elif len(op_list)==2 and isinstance(op_list[0],str) and op_list[0] in single_arg_operators:
+        elif len(op_list)==2 and isinstance(op_list[0],str) and op_list[0] in single_arg_operators: # Recognized single argument expressions
             return node(op_list[0],right=self.list2tree(op_list[1]))
 
-        elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):
+        elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):        # arbitrary function
             return node(op_list[0],right = node(op_list[1]))
         
         if op_list[0]=='-':            # case of -x
@@ -403,6 +403,7 @@ class exp:
 
         if base.val not in op_order:
             return str(base.val)
+        
         
         if last_operator and op_order[base.val]<op_order[last_operator]:
             return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
