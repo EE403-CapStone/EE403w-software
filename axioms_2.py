@@ -94,6 +94,7 @@ class exp:
         # Converts a tokenized expression to a tree
         # list2tree(['a','+','b'])=> node(val='+', left=node('a'), right=node('b'))
         # Handles parhentesis
+
         single_arg_operators = [
             'sin',
             'cos',
@@ -120,9 +121,9 @@ class exp:
         
         elif len(op_list)==2 and isinstance(op_list[0],str) and op_list[0] in single_arg_operators:
             return node(op_list[0],right=self.list2tree(op_list[1]))
-            
+
         elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):
-            return node(op_list[0],right = node(''.join(op_list[1])))
+            return node(op_list[0],right = node(op_list[1]))
         
         if op_list[0]=='-':            # case of -x
             op_list[:2] = [-1,'*',op_list[1]]
@@ -345,12 +346,15 @@ class exp:
             if base.val not in self.dir:
                 self.dir[base.val] = []
             self.dir[base.val].append(d)
+        
+        arbitrary_function = base.right!=None and isinstance(base.right.val,list)
 
-        if base.left is not None:
-            self.map(base.left,d+[1])
+        if not arbitrary_function:
+            if base.left is not None:
+                self.map(base.left,d+[1])
 
-        if base.right is not None:
-            self.map(base.right,d+[0])
+            if base.right is not None:
+                self.map(base.right,d+[0])
 
     def __str__(self):
         # Returns a string expression that is an equivalent expression to the graph
