@@ -496,12 +496,28 @@ class exp:
     def partial_D(self,var,root = None):
         # a is a node object with left and right components
         d_map = {
-            '+':lambda a: node('+',self.partial_D(var,root.left),self.partial_D(var,root.right)),
-            '-':None,
-            '*':None,
-            '/':None,
-            '^':None,
-            'sin':None,
+            '+':lambda a: node('+',self.partial_D(var,a.left),self.partial_D(var,a.right)),
+            '-':lambda a: node('-',self.partial_D(var,a.left),self.partial_D(var,a.right)),
+            '*':lambda a: node(
+                '+',
+                left = node('*',self.partial_D(var,a.left),a.right),
+                right = node('*',a.left,self.partial_D(var,a.right))),
+
+            '/':lambda a:node(
+                '/',
+                left=node(
+                  '-',
+                  left = node('*',a.right,self.partial_D(a.left)),
+                  right = node('*',a.left,self.partial_D(a.right))
+                ),
+                right = node('^',left = a.right,right=node(2))
+            ),
+            '^':None,   # need to make 
+            'sin':lambda a:node(
+                '*',
+                left = self.partial_D(var,a.right),
+                right = node('cos',right=a.right)
+            ),
             'cos':None,
             'tan':None,
             'csc':None,
