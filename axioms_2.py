@@ -53,10 +53,6 @@ class exp:
             return True
         elif s=='False':
             return False
-        elif s=='pi':
-            return 3.14159265358979323846
-        elif s == 'e':
-            return 2.718281828459045
         
         ## Need to make a list of reserved strings ##
 
@@ -245,6 +241,8 @@ class exp:
         }
 
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
+            val_dict['pi'] = 3.141592653589793
+            val_dict['e'] = 2.718281828459045
             if root.val in val_dict:
                 return val_dict[root.val]
             return None
@@ -493,40 +491,58 @@ class exp:
         if operator in inv_map:
             return inv_map[operator](inv_root)
 
-    def partial_D(self,var,root = None):
+    def partial_D(self,root=None,var=''):
+        if var=='':
+            raise Exception(f'df/d"x" not defined in partial derivative')
         # a is a node object with left and right components
+        
         d_map = {
-            '+':lambda a: node('+',self.partial_D(var,a.left),self.partial_D(var,a.right)),
-            '-':lambda a: node('-',self.partial_D(var,a.left),self.partial_D(var,a.right)),
-            '*':lambda a: node(
+            '+':lambda a,var: node('+',self.partial_D(a.left,var),self.partial_D(a.right,var)),
+            '-':lambda a,var: node('-',self.partial_D(a.left,var),self.partial_D(a.right,var)),
+            '*':lambda a,var: node(
                 '+',
-                left = node('*',self.partial_D(var,a.left),a.right),
-                right = node('*',a.left,self.partial_D(var,a.right))),
+                left = node('*',self.partial_D(a.left,var),a.right),
+                right = node('*',a.left,self.partial_D(a.right,var))),
 
-            '/':lambda a:node(
+            '/':lambda a,var:node(
                 '/',
                 left=node(
                   '-',
-                  left = node('*',a.right,self.partial_D(a.left)),
-                  right = node('*',a.left,self.partial_D(a.right))
+                  left = node('*',a.right,self.partial_D(a.left,var)),
+                  right = node('*',a.left,self.partial_D(a.right,var))
                 ),
                 right = node('^',left = a.right,right=node(2))
             ),
-            '^':None,   # need to make 
-            'sin':lambda a:node(
+
+            '^':lambda a,var:self._power_D(a), ## general formula for f^g was too hairy for lambda function
+
+            'sin':lambda a,var:node(
                 '*',
-                left = self.partial_D(var,a.right),
+                left = self.partial_D(a.right,var),
                 right = node('cos',right=a.right)
             ),
-            'cos':None,
-            'tan':None,
+
+            'cos':lambda a,var:node(
+                '*',
+                left = node('*',node(-1),self.partial_D(a.right,var)),
+                right = node('sin',node(a.right))
+            ),
+
+            'tan':lambda a,var:node(
+                '*',
+                left = self.partial_D(a.right,var),
+                right=node(
+                    '^',
+                    left = node('sec',right=a.right),
+                    right = node(2))
+            ),
+
             'csc':None,
-            'sec':None,
-            'tan':None,
             'cot':None,
             'asin':None,
             'acos':None,
-            'atan':None
+            'atan':None,
+            'exp':lambda a,var: node('*',left=self.partial_D(a.right,var),right=a)
         }
 
         if root==None:
@@ -538,10 +554,34 @@ class exp:
         elif root.val not in d_map:
             return node(0)
         
+        return d_map[root.val](root,var)
         
-        if isinstance(root.val,str) and root.val not in []:
-            pass
-    
+
+    def _power_D(self,root,var):# general formula for df/dx(f^g) where f and g are functions of x
+        f = root.left
+        g = root.right
+        
+        # s1 = (g*f')/f
+        s1 = node(
+            '/',
+            left = node(
+                '*',
+                g,
+                self.partial_D(f,var)
+            ),
+            right = f
+        )
+        # s2 = g'*ln(f)
+        s2 = node(
+            '*',
+            left = self.partial_D(g,var),
+            right= node('ln',right=f)
+        )
+
+        s = node('+',s1,s2)
+
+        return node('*',left = root,right=s)
+
     def _exp_classify():
         # Classifying expressions for the purposes making decisions of how to integrate,
         # and analyical or numerical solutions
