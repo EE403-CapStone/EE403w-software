@@ -90,7 +90,7 @@ class _list_expr(Command):
 class _help(Command):
     def __init__(self):
         cmd_str = "help"
-        help_str = "Descripton: displays help text for a given command\nUsage: help COMMAND\n       help all #to display all commands"
+        help_str = "Description: displays help text for a given command\nUsage: help COMMAND\n       help all #to display all commands"
 
         super().__init__(cmd_str, help_str, _help.callback)
 
@@ -120,7 +120,7 @@ class _help(Command):
 class _exit(Command):
     def __init__(self):
         cmd_str = "exit"
-        help_str = "Descripton: exits calculator program\nUsage: exit"
+        help_str = "Description: exits calculator program\nUsage: exit"
 
         super().__init__(cmd_str, help_str, _exit.callback)
 
@@ -131,7 +131,7 @@ class _exit(Command):
 class _eval(Command):
     def __init__(self):
         cmd_str = "eval"
-        help_str = "Descripton: Evaluates expression (functions, numerica values, etc.)\nUsage: eval EXPRESSION"
+        help_str = "Description: Evaluates expression (functions, numerica values, etc.)\nUsage: eval EXPRESSION"
 
         super().__init__(cmd_str, help_str, _eval.callback)
 
@@ -178,7 +178,6 @@ class Exp(ExpBase):
     #  they could probably be moved into something similar
     #  CLI commands Command class. that would likely be a more
     #  robust solution
-
     def __init__(self, txt:str=None, root=None):
         # HACK Axioms recognizes arbitrary functions with a single argument.
         # HACK  unfortunately, commas cannot be used as delimeters, as they are
@@ -190,7 +189,7 @@ class Exp(ExpBase):
         if txt != None:
             formatted_txt = txt.replace(',','`')
 
-        super().__init__(formatted_txt, root)
+        super().__init__(txt, root)
 
     '''
     looks for arbitrary functions in the expression tree.
@@ -203,7 +202,12 @@ class Exp(ExpBase):
             root = self.root
 
         if root.val in Exp.funcs:
-            argv = root.right.val.split('`') # split at grave, because hack.
+            # the arguments for the arbitrary function are a list of tokenized operators
+            argv = ''
+            for op in root.right.val[0]:
+                argv += op
+
+            argv = root.right.val.split(',')
             expr = Exp.funcs[root.val](argv, env)
 
             # splice in the root of the new expression at this node.
