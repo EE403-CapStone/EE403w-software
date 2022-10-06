@@ -244,8 +244,8 @@ class expr:
         }
 
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
-            val_dict['pi'] = 3.141592653589793
-            val_dict['e'] = 2.718281828459045
+            val_dict['pi'] = np.pi
+            val_dict['e'] = np.e
             if root.val in val_dict:
                 return val_dict[root.val]
             return None
@@ -405,6 +405,8 @@ class expr:
         if base.val not in op_order:
             return str(base.val)
         
+        if isinstance(base.val,str) and base.right!=None:
+            return f'{base.val}({",".join(base.right.val)})'
         
         if last_operator and op_order[base.val]<op_order[last_operator]:
             return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
