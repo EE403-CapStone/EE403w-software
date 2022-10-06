@@ -401,6 +401,8 @@ class expr:
         
         if base.val in single_op:
             return base.val+'('+self._str_aux(base.right,base.val)+')'
+        elif isinstance(base.val,str) and base.left==None and base.right!=None: # Arbitrary functions
+            return base.val+'('+','.join(base.right.val)+')'
 
         if base.val not in op_order:
             return str(base.val)
