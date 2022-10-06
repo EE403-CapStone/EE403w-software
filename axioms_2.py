@@ -10,7 +10,7 @@ from ast import Pass, operator
 import doctest
 import numpy as np
 
-class exp:
+class expr:
     def __init__(self,exp:str=None,root=None,**kwargs):
         # str expressions and roots of trees to define expression objects
         self.root = root
@@ -198,7 +198,7 @@ class exp:
         # it is assumed the expressions are valid
 
         '''
-        >>> a = exp('a+b')
+        >>> a = expr('a+b')
         >>> a.evaluate(val_dict={'a':1,'b':2})
         3
         '''
@@ -359,9 +359,9 @@ class exp:
         # str and __init__ should be rough inverses of each other
         # 'a$b'== str(exp('a$b'))
         """
-        >>> print(exp('a+b'))
+        >>> print(expr('a+b'))
         a+b
-        >>> print(exp('(a+b)*c'))
+        >>> print(expr('(a+b)*c'))
         (a+b)*c
         """        
         return self._str_aux(self.root)
@@ -427,7 +427,7 @@ class exp:
 
         if include_var:
             inv_tree = node('=',root,inv_tree)
-        return exp(root = inv_tree)
+        return expr(root = inv_tree)
 
     def __invert_aux(self,tree,left:int,inv_root=None):
         # Performs the inverse operation of a single node operation 
@@ -491,25 +491,30 @@ class exp:
         if operator in inv_map:
             return inv_map[operator](inv_root)
 
-    def partial_D(self,root=None,var=''):
+    def pD(self,var):
+        root = self._partial_D_aux(var=var)
+
+        #reduce functionality
+        
+    def _partial_D_aux(self,root=None,var=''):
         if var=='':
             raise Exception(f'df/d"x" not defined in partial derivative')
         # a is a node object with left and right components
         
         d_map = {
-            '+':lambda a,var: node('+',self.partial_D(a.left,var),self.partial_D(a.right,var)),
-            '-':lambda a,var: node('-',self.partial_D(a.left,var),self.partial_D(a.right,var)),
+            '+':lambda a,var: node('+',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
+            '-':lambda a,var: node('-',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
             '*':lambda a,var: node(
                 '+',
-                left = node('*',self.partial_D(a.left,var),a.right),
-                right = node('*',a.left,self.partial_D(a.right,var))),
+                left = node('*',self._partial_D_aux(a.left,var),a.right),
+                right = node('*',a.left,self._partial_D_aux(a.right,var))),
 
             '/':lambda a,var:node(
                 '/',
                 left=node(
                   '-',
-                  left = node('*',a.right,self.partial_D(a.left,var)),
-                  right = node('*',a.left,self.partial_D(a.right,var))
+                  left = node('*',a.right,self._partial_D_aux(a.left,var)),
+                  right = node('*',a.left,self._partial_D_aux(a.right,var))
                 ),
                 right = node('^',left = a.right,right=node(2))
             ),
@@ -518,19 +523,19 @@ class exp:
 
             'sin':lambda a,var:node(
                 '*',
-                left = self.partial_D(a.right,var),
+                left = self._partial_D_aux(a.right,var),
                 right = node('cos',right=a.right)
             ),
 
             'cos':lambda a,var:node(
                 '*',
-                left = node('*',node(-1),self.partial_D(a.right,var)),
+                left = node('*',node(-1),self._partial_D_aux(a.right,var)),
                 right = node('sin',node(a.right))
             ),
 
             'tan':lambda a,var:node(
                 '*',
-                left = self.partial_D(a.right,var),
+                left = self._partial_D_aux(a.right,var),
                 right=node(
                     '^',
                     left = node('sec',right=a.right),
@@ -542,7 +547,7 @@ class exp:
             'asin':None,
             'acos':None,
             'atan':None,
-            'exp':lambda a,var: node('*',left=self.partial_D(a.right,var),right=a)
+            'exp':lambda a,var: node('*',left=self._partial_D_aux(a.right,var),right=a)
         }
 
         if root==None:
@@ -556,6 +561,56 @@ class exp:
         
         return d_map[root.val](root,var)
         
+    def _reduce(self,root):
+        operator = [
+            '=',
+            '|',
+            '&',
+            '!',
+            '+',
+            '-',
+            '%',
+            '*',
+            '/',
+            '^',
+            '==',
+            '<',
+            '<=',
+            '>',
+            '>=',
+            'cos',
+            'sin',
+            'tan',
+            'sec',
+            'csc',
+            'cot',
+            'asin',
+            'acos',
+            'atan',
+            'ln']
+        
+        if isinstance(root.val,str) and root.val not in operator:
+            right = self._reduce(root.right)
+            left = self._reduce(root.left)
+
+        if root.val=='+':
+            if root.right.val ==0:
+                return root.left
+            elif root.left.val == 0:
+                return root.right
+        
+        elif root.val=='*':
+            if root.right.val==1:
+                return root.left
+            elif root.left.val==1:
+                return root.right
+        
+        elif root.val=='exp':
+            pass
+
+        root.right = self.reduce(root.right)
+        root.left = self.reduce(root.left)
+        pass
 
     def _power_D(self,root,var):# general formula for df/dx(f^g) where f and g are functions of x
         f = root.left
@@ -567,14 +622,14 @@ class exp:
             left = node(
                 '*',
                 g,
-                self.partial_D(f,var)
+                self._partial_D_aux(f,var)
             ),
             right = f
         )
         # s2 = g'*ln(f)
         s2 = node(
             '*',
-            left = self.partial_D(g,var),
+            left = self._partial_D_aux(g,var),
             right= node('ln',right=f)
         )
 

@@ -1,4 +1,4 @@
-from axioms_2 import exp as ExpBase
+from axioms_2 import expr as ExpBase
 from axioms_2 import node
 
 """
