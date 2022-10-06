@@ -119,7 +119,10 @@ class expr:
             return node(op_list[0],right=self.list2tree(op_list[1]))
 
         elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):        # arbitrary function
-            return node(op_list[0],right = node(op_list[1]))
+            temp = ''.join(op_list[1][0])
+            temp = list(temp.split(','))
+            # temp = list(temp.split(','))
+            return node(op_list[0],right = node(temp))
         
         if op_list[0]=='-':            # case of -x
             op_list[:2] = [-1,'*',op_list[1]]
@@ -562,55 +565,47 @@ class expr:
         return d_map[root.val](root,var)
         
     def _reduce(self,root):
-        operator = [
-            '=',
-            '|',
-            '&',
-            '!',
-            '+',
-            '-',
-            '%',
-            '*',
-            '/',
-            '^',
-            '==',
-            '<',
-            '<=',
-            '>',
-            '>=',
-            'cos',
-            'sin',
-            'tan',
-            'sec',
-            'csc',
-            'cot',
-            'asin',
-            'acos',
-            'atan',
-            'ln']
-        
-        if isinstance(root.val,str) and root.val not in operator:
-            right = self._reduce(root.right)
-            left = self._reduce(root.left)
+
+        if isinstance(root.val,str) and root.right==None: #instances of variables 
+            return root
+        elif type(root.val) in [int,bool,complex,float]:
+            return root
+
+        right = self._reduce(root.right)
+        left = self._reduce(root.left)
 
         if root.val=='+':
-            if root.right.val ==0:
+            if right.val ==0:
                 return root.left
-            elif root.left.val == 0:
+            elif left.val == 0:
                 return root.right
         
         elif root.val=='*':
-            if root.right.val==1:
-                return root.left
-            elif root.left.val==1:
-                return root.right
+            if right.val==1:
+                return right
+            elif left.val==1:
+                return left
+            elif right.val or left.val ==0:
+                return node(0)
+
+        elif root.val == '/':
+            if right.val==1:
+                return left
+            pass
         
         elif root.val=='exp':
-            pass
+            if right.val==0:
+                return node(1)
 
-        root.right = self.reduce(root.right)
-        root.left = self.reduce(root.left)
-        pass
+        elif root.val=='^':
+            if right.val==0 and left.val!=0:
+                return node(0)
+            elif left.val== (0) and right.val==(0):
+                raise Exception('Invalid expression 0^0')
+            elif left.val==1:
+                return node(1)
+        
+        
 
     def _power_D(self,root,var):# general formula for df/dx(f^g) where f and g are functions of x
         f = root.left
