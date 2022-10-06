@@ -400,13 +400,10 @@ class expr:
         }
         
         if base.val in single_op:
-            return base.val+'('+self._str_aux(base.right)+')'
+            return base.val+'('+self._str_aux(base.right,base.val)+')'
 
         if base.val not in op_order:
             return str(base.val)
-        
-        if isinstance(base.val,str) and base.right!=None:
-            return f'{base.val}({",".join(base.right.val)})'
         
         if last_operator and op_order[base.val]<op_order[last_operator]:
             return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
