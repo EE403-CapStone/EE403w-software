@@ -48,6 +48,7 @@ class State:
             suppress_output = True
             cmd = cmd[:-1]
 
+        # BUG error if there is leading whitespace
         argv = cmd.split(' ')
 
         # TODO the implied set_expr is not implemented yet.
@@ -160,7 +161,21 @@ if __name__ == "__main__":
     #setup QT6 context
     app = QtWidgets.QApplication([])
 
-    monofont = QtGui.QFont("Monospace", 13)
+    # TODO make this a list of list of strings, to add all the fonts for each font family
+    fonts = ['fira-mono/FiraMono-Regular.otf',
+             'OCR A Std Regular/OCR A Std Regular.ttf',
+             'Minecraft/Minecraft-Regular.otf'
+            ]
+
+    for font in fonts:
+        font_dir = QtCore.QDir.currentPath() + '/fonts/' + font
+        id = QtGui.QFontDatabase.addApplicationFont(font_dir)
+        print(font+':', id)
+
+    # load Minecraft font
+    fonts = QtGui.QFontDatabase.applicationFontFamilies(0)
+    print(fonts)
+    monofont = QtGui.QFont(fonts[0], 14)
     app.setFont(monofont)
 
     widget = MainWindow()
