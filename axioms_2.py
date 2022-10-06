@@ -400,7 +400,7 @@ class expr:
         }
         
         if base.val in single_op:
-            return base.val+'('+self._str_aux(base.right,base.val)+')'
+            return base.val+'('+self._str_aux(base.right)+')'
         elif isinstance(base.val,str) and base.left==None and base.right!=None: # Arbitrary functions
             return base.val+'('+','.join(base.right.val)+')'
 
@@ -496,11 +496,14 @@ class expr:
             return inv_map[operator](inv_root)
 
     def pD(self,var):
-        root = self._partial_D_aux(var=var)
+        root = self._partial_D_aux(self.root,var)
+        root = self._reduce(root)
+        return expr(root=root)
+        
 
         #reduce functionality
         
-    def _partial_D_aux(self,root=None,var=''):
+    def _partial_D_aux(self,root,var=''):
         if var=='':
             raise Exception(f'df/d"x" not defined in partial derivative')
         # a is a node object with left and right components
@@ -554,8 +557,6 @@ class expr:
             'exp':lambda a,var: node('*',left=self._partial_D_aux(a.right,var),right=a)
         }
 
-        if root==None:
-            root = self.root
 
         if root.val==var:
             return node(1)
@@ -566,37 +567,56 @@ class expr:
         return d_map[root.val](root,var)
         
     def _reduce(self,root):
-
+        
         if isinstance(root.val,str) and root.right==None: #instances of variables 
             return root
         elif type(root.val) in [int,bool,complex,float]:
             return root
 
         right = self._reduce(root.right)
-        left = self._reduce(root.left)
+        left = None
+        if root.left:
+            left = self._reduce(root.left)
 
         if root.val=='+':
-            if right.val ==0:
-                return root.left
-            elif left.val == 0:
-                return root.right
+            if left.val ==0:
+                return right
+            elif right.val == 0:
+                return left
+        elif root.val=='-':
+            if right.val==0:
+                return left
+            elif left.val==0:
+                return node('*',node(-1),right)
         
         elif root.val=='*':
+            e = str(expr(root=root))
+
             if right.val==1:
-                return right
-            elif left.val==1:
                 return left
-            elif right.val or left.val ==0:
+            elif left.val==1:
+                return right
+            elif left.val==0 or right.val == 0:
                 return node(0)
 
         elif root.val == '/':
             if right.val==1:
+                return left
+            if left.val==0:
                 return left
             pass
         
         elif root.val=='exp':
             if right.val==0:
                 return node(1)
+            if right.val=='ln':
+                return right.right
+        
+        elif root.val=='ln':
+            if right.val=='e':
+                return node(1)
+            if right.val=='exp':
+                return right.right            
 
         elif root.val=='^':
             if right.val==0 and left.val!=0:
@@ -605,6 +625,15 @@ class expr:
                 raise Exception('Invalid expression 0^0')
             elif left.val==1:
                 return node(1)
+        
+        elif root.val=='sin':
+            if right==0:
+                return right
+        elif root.val=='cos':
+            if right==0:
+                return node(1)
+        
+        return node(root.val,left,right)
         
         
 
