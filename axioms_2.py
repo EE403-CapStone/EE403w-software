@@ -423,7 +423,6 @@ class expr:
                 raise Exception(f'\'{var}\' not found in Expression')
             path = self.dir[var][0] # if path is not specified takes the first path in dir
         
-        
         for d in path:
             inv_tree = self.__invert_aux(root,d,inv_tree)
             root = root.left if d else root.right
@@ -437,11 +436,40 @@ class expr:
         # given the left/right direction of the component that is being solved for
         # returns a inv_tree that is the parameter inv_tree operated on by the 
         # inv of the base.val operation
-
+        left_inv_dict = {
+            '=':None,
+            '+':None,
+            '-':None,
+            '*':None,
+            '/':None,
+            '^':None,
+            '=':None
+        }
+        right_inv_dict={
+            '=':None,
+            '+':None,
+            '-':None,
+            '*':None,
+            '/':None,
+            '^':None,
+            '!':None,
+            'exp':None,
+            'ln':None,
+            'sin':None,
+            'cos':None,
+            'tan':None,
+            'csc':None,
+            'sec':None,
+            'cot':None,
+            'asin':None,
+            'acos':None,
+            'atan':None,
+        }
         operator = tree.val
         # can make this a mapping of lambda functions for commutable operations and single operators
 
         # Double operations that are non commutable
+
         if operator=='=':
             if inv_root==None:
                 return tree.right if left else tree.left
@@ -634,7 +662,7 @@ class expr:
         if root.val==var:
             return node(1)
         
-        elif root.val not in d_map:
+        elif root.right == None and root.val not in d_map or type(root) in [bool,int,float,complex]:
             return node(0)
         
         return d_map[root.val](root,var)
