@@ -510,14 +510,15 @@ class expr:
         # nodes of a are assummed to be functions of var
         
         d_map = {
-            '+':lambda a,var: node('+',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
-            '-':lambda a,var: node('-',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
-            '*':lambda a,var: node(
+            '+':lambda a,var: node( # f+g => f'+g'
+                '+',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
+            '-':lambda a,var: node( # f-g => f'-g'
+                '-',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
+            '*':lambda a,var: node( # f*g => f'g+fg'
                 '+',
                 left = node('*',self._partial_D_aux(a.left,var),a.right),
                 right = node('*',a.left,self._partial_D_aux(a.right,var))),
-
-            '/':lambda a,var:node(
+            '/':lambda a,var:node( # f/g => (f'*g-f*g')/(g^2)
                 '/',
                 left=node(
                   '-',
@@ -529,19 +530,17 @@ class expr:
 
             '^':lambda a,var:self._power_D(a,var), ## general formula for f^g was too hairy for lambda function
 
-            'sin':lambda a,var:node(
+            'sin':lambda a,var:node( # sin(f)=> f'*cos(f)
                 '*',
                 left = self._partial_D_aux(a.right,var),
                 right = node('cos',right=a.right)
             ),
-
-            'cos':lambda a,var:node(
+            'cos':lambda a,var:node( # cos(f)=> -f'*sin(f)
                 '*',
                 left = node('*',node(-1),self._partial_D_aux(a.right,var)),
                 right = node('sin',node(a.right))
             ),
-
-            'tan':lambda a,var:node(
+            'tan':lambda a,var:node( # tan(f)=> f'*sec(f)^2
                 '*',
                 left = self._partial_D_aux(a.right,var),
                 right=node(
@@ -549,13 +548,86 @@ class expr:
                     left = node('sec',right=a.right),
                     right = node(2))
             ),
-
-            'csc':None,
-            'cot':None,
-            'asin':None,
-            'acos':None,
-            'atan':None,
-            'exp':lambda a,var: node('*',left=self._partial_D_aux(a.right,var),right=a)
+            'csc':lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
+                '*',
+                node(-1),
+                node(
+                    '*',
+                    node(self._partial_D_aux(a.right,var)),
+                    node(
+                        '*',
+                        node('csc',right=a),
+                        node('cot',right=a)
+                    )
+                )
+            ),
+            'cot':lambda a,var:node(  # cot(f) => -f'*csc(f)^2
+                '*',
+                node(-1),
+                node(
+                    '*',
+                    self._partial_D_aux(a.right,var),
+                    node(
+                        '^',
+                        node('csc',right=a),
+                        node(2)
+                    )
+                )
+            ),
+            'asin':lambda a,var:node( # asin(f) => f'/sqrt(1-f^2)
+                node(
+                    '/',
+                    self._partial_D_aux(a.right,var),
+                    node(
+                        '^',
+                        node(
+                            '-',
+                            node(1),
+                            node('^',a,node(2))
+                        ),
+                        node(1/2)
+                    )
+                )
+            ),
+            'acos':lambda a,var:node( # acos(f) => -1*f'/sqrt(1-f^2)
+                node(
+                    '/',
+                    node(
+                        '*',
+                        node(-1),
+                        self._partial_D_aux(a.right,var)
+                    ),
+                    node(
+                        '^',
+                        node(
+                            '-',
+                            node(1),
+                            node('^',a,node(2))
+                        ),
+                        node(1/2)
+                    )
+                )
+            ),
+            'atan':lambda a,var:node( # atan(f) => f'/(1+f^2)
+                '/',
+                self._partial_D_aux(a.right,var),
+                node(
+                    '+',
+                    node(1),
+                    node(
+                        '^',
+                        a.right,
+                        node(2)
+                    )
+                )
+            ),
+            'exp':lambda a,var: node( # exp(f) => f'*exp(f)
+                '*',left=self._partial_D_aux(a.right,var),right=a),
+            '=':lambda a,var:node( # f=g => f'=g'
+                '=',
+                self._partial_D_aux(a.left,var),
+                self._partial_D_aux(a.right,var)
+            )
         }
 
 
@@ -566,7 +638,8 @@ class expr:
             return node(0)
         
         return d_map[root.val](root,var)
-        
+
+
     def _reduce(self,root):
         
         if isinstance(root.val,str) and root.right==None: #instances of variables 
