@@ -119,9 +119,8 @@ class expr:
             return node(op_list[0],right=self.list2tree(op_list[1]))
 
         elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):        # arbitrary function
-            temp = ''.join(op_list[1][0])
-            temp = list(temp.split(','))
-            # temp = list(temp.split(','))
+            temp = ''.join(map(str,op_list[1][0]))
+            temp = temp.split(',')
             return node(op_list[0],right = node(temp))
         
         if op_list[0]=='-':            # case of -x
@@ -506,7 +505,9 @@ class expr:
     def _partial_D_aux(self,root,var=''):
         if var=='':
             raise Exception(f'df/d"x" not defined in partial derivative')
-        # a is a node object with left and right components
+        # a is the root of an expr with left and right components
+        # below is a map of derivative rules written as da/dvar where left and right
+        # nodes of a are assummed to be functions of var
         
         d_map = {
             '+':lambda a,var: node('+',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
@@ -526,7 +527,7 @@ class expr:
                 right = node('^',left = a.right,right=node(2))
             ),
 
-            '^':lambda a,var:self._power_D(a), ## general formula for f^g was too hairy for lambda function
+            '^':lambda a,var:self._power_D(a,var), ## general formula for f^g was too hairy for lambda function
 
             'sin':lambda a,var:node(
                 '*',
@@ -615,7 +616,9 @@ class expr:
         elif root.val=='ln':
             if right.val=='e':
                 return node(1)
-            if right.val=='exp':
+            elif right.val=='^' and right.left.val=='e':
+                return right.right
+            elif right.val=='exp':
                 return right.right            
 
         elif root.val=='^':
@@ -660,7 +663,7 @@ class expr:
 
         s = node('+',s1,s2)
 
-        return node('*',left = root,right=s)
+        return node('*',left = s,right=root)
 
     def _exp_classify():
         # Classifying expressions for the purposes making decisions of how to integrate,
