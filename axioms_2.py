@@ -537,7 +537,7 @@ class expr:
         # below is a map of derivative rules written as da/dvar where left and right
         # nodes of a are assummed to be functions of var
         
-        d_map = {
+        d_map = {                   # df/dx where f(x)
             '+':lambda a,var: node( # f+g => f'+g'
                 '+',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
             '-':lambda a,var: node( # f-g => f'-g'
@@ -546,7 +546,7 @@ class expr:
                 '+',
                 left = node('*',self._partial_D_aux(a.left,var),a.right),
                 right = node('*',a.left,self._partial_D_aux(a.right,var))),
-            '/':lambda a,var:node( # f/g => (f'*g-f*g')/(g^2)
+            '/':lambda a,var:node(  # f/g => (f'*g-f*g')/(g^2)
                 '/',
                 left=node(
                   '-',
@@ -558,17 +558,17 @@ class expr:
 
             '^':lambda a,var:self._power_D(a,var), ## general formula for f^g was too hairy for lambda function
 
-            'sin':lambda a,var:node( # sin(f)=> f'*cos(f)
+            'sin' :lambda a,var:node( # sin(f)=> f'*cos(f)
                 '*',
                 left = self._partial_D_aux(a.right,var),
                 right = node('cos',right=a.right)
             ),
-            'cos':lambda a,var:node( # cos(f)=> -f'*sin(f)
+            'cos' :lambda a,var:node( # cos(f)=> -f'*sin(f)
                 '*',
                 left = node('*',node(-1),self._partial_D_aux(a.right,var)),
                 right = node('sin',node(a.right))
             ),
-            'tan':lambda a,var:node( # tan(f)=> f'*sec(f)^2
+            'tan' :lambda a,var:node( # tan(f)=> f'*sec(f)^2
                 '*',
                 left = self._partial_D_aux(a.right,var),
                 right=node(
@@ -576,7 +576,7 @@ class expr:
                     left = node('sec',right=a.right),
                     right = node(2))
             ),
-            'csc':lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
+            'csc' :lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
                 '*',
                 node(-1),
                 node(
@@ -589,7 +589,7 @@ class expr:
                     )
                 )
             ),
-            'cot':lambda a,var:node(  # cot(f) => -f'*csc(f)^2
+            'cot' :lambda a,var:node( # cot(f) => -f'*csc(f)^2
                 '*',
                 node(-1),
                 node(
@@ -649,9 +649,9 @@ class expr:
                     )
                 )
             ),
-            'exp':lambda a,var: node( # exp(f) => f'*exp(f)
+            'exp' :lambda a,var:node( # exp(f) => f'*exp(f)
                 '*',left=self._partial_D_aux(a.right,var),right=a),
-            '=':lambda a,var:node( # f=g => f'=g'
+            '='   :lambda a,var:node( # f=g => f'=g'
                 '=',
                 self._partial_D_aux(a.left,var),
                 self._partial_D_aux(a.right,var)
