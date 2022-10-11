@@ -47,6 +47,7 @@ class expr:
         return root
 
     def _str2values(self,s:str)->any:
+        #TODO Need to clean up this code
         # Given str inputs recognizes bool int float and complex values
         # recognizes reserved values such as 'pi'
         if s=='True':
@@ -57,9 +58,8 @@ class expr:
         ## Need to make a list of reserved strings ##
 
         # recognize if the string is a valid number return an error if not
-        iscomplex = s[-1]=='j' and s != 'j'
-        s = s[:-1] if iscomplex else s
-
+        iscomplex = s[-1] in ['i','j']
+        s = s[:-1] if iscomplex and s not in ['i','j'] else s
         # Handling integer values
         if s.isdigit():
             r = int(s)*1j if iscomplex else int(s)
@@ -246,6 +246,7 @@ class expr:
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
             val_dict['pi'] = np.pi
             val_dict['e'] = np.e
+            val_dict['i'] = 1j
             if root.val in val_dict:
                 return val_dict[root.val]
             return None
