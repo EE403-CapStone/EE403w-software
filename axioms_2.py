@@ -470,10 +470,10 @@ class expr:
                     right=left
                 )
             ),
-            # '!':lambda inv_tree,left:node(
-            #     '!',
-            #     right=inv_tree
-            # ),
+            '!':lambda inv_tree,left:node(
+                '!',
+                right=inv_tree
+            ),
             'exp':lambda inv_tree,left:node(
                 'ln',
                 right=inv_tree
@@ -848,17 +848,9 @@ def _tokenize(input_str:str)->list:
         'ln',
         ','
     ]
-    # trig = [
-    #     ' sin',
-    #     ' cos',
-    #     ' tan',
-    #     ' csc',
-    #     ' sec',
-    #     ' cot',
-    #     ' asin',
-    #     ' acos',
-    #     ' atan'
-    # ]
+    # trig functions and single argument expresssions
+    # are implicitly tokenized if used correctly in an expression
+
     for e in exp_list:
         input_str = input_str.replace(e,' '+e+' ')
     input_str = ' '+input_str
