@@ -46,45 +46,39 @@ class expr:
         root = self.list2tree(exp_list)
         return root
 
-    def _str2values(self,s:str)->any:
-        # Given str inputs recognizes bool int float and complex values
-        # recognizes reserved values such as 'pi'
-        if s=='True':
-            return True
-        elif s=='False':
-            return False
-        
-        ## Need to make a list of reserved strings ##
+    def _str2values(self,s):
+        # Converts a string to values that are recognized as either bool, int, float, complex
+        # Where naming conventions match python 
 
-        # recognize if the string is a valid number return an error if not
-        iscomplex = s[-1]=='j' and s != 'j'
+        special_cases = {
+            '':None,
+            'True':True,
+            'False':False,
+            'j':1j
+        }
+
+        if s in special_cases:
+            return special_cases[s]
+
+
+        iscomplex = s[-1]=='j'
         s = s[:-1] if iscomplex else s
-
-        # Handling integer values
-        if s.isdigit():
-            r = int(s)*1j if iscomplex else int(s)
-            return r
         
-        # Handling floats
         if s.count('.')==1:
-            z,decimal = s.split('.')
-            if not z.isdigit() or not decimal.isdigit():
-                raise Exception(f'{s} is not a valid number or variable')
-
-            r = r*1j if iscomplex else r
-            return r
-
-        elif s.count('.')>1:
-            raise Exception(f'{s} is not a valid number or variable')
+            n,dec = s.split('.')
+            power = len(dec)
+            if n.isdigit() and dec.isdigit():
+                n,dec = map(float,[n,dec])
+                dec/=10**power
+                return (n+dec)*1j if iscomplex else n+dec
         
-
+        if s.isdigit():
+            return int(s)*1j if iscomplex else int(s)
+        
         if s[0].isdigit():
-            raise Exception(f'variable {s} cannot start with a number or is an incorrectly formatted number')
-        
-        # When s cannot be converted into some number and is correctly formatted as a variable
-        # pass it back as a string
-        s = s+'j' if iscomplex else s
-        return s
+            raise Exception(f'{s} is an invalid variable name')
+
+        return s+'j' if iscomplex else s
 
     def list2tree(self,op_list:list):
         # Converts a tokenized expression to a tree
