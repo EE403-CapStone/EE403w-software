@@ -96,7 +96,8 @@ class expr:
             'acos',
             'atan',
             '!',
-            'exp'
+            'exp',
+            'ln'
             ]
         
         while '(' in op_list:           # compresses parhentesis protected expressions
@@ -239,6 +240,7 @@ class expr:
         if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
             val_dict['pi'] = np.pi
             val_dict['e'] = np.e
+            val_dict['i'] = 1j
             if root.val in val_dict:
                 return val_dict[root.val]
             return None
@@ -405,116 +407,157 @@ class expr:
 
         return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
 
-    def invert_branch(self,var,root=None,inv_tree=None, path:list=[],include_var:bool=False):
+    def invert_branch(self,var,include_var:bool=False):
         # Used for generating symbolic algebraic solutions to equations
         # inverts a particular path of the tree
         # generally used for inverting the path to a particular var
         # 'include_var'=True if the returned tree to be expressed as 'var = inv_tree'
-
-        if root==None:
-            root=self.root
-            if var not in self.dir:
-                raise Exception(f'\'{var}\' not found in Expression')
-            path = self.dir[var][0] # if path is not specified takes the first path in dir
-        
-        for d in path:
-            inv_tree = self.__invert_aux(root,d,inv_tree)
-            root = root.left if d else root.right
-
-        if include_var:
-            inv_tree = node('=',root,inv_tree)
-        return expr(root = inv_tree)
-
-    def __invert_aux(self,tree,left:int,inv_root=None):
-        # Performs the inverse operation of a single node operation 
-        # given the left/right direction of the component that is being solved for
-        # returns a inv_tree that is the parameter inv_tree operated on by the 
-        # inv of the base.val operation
         left_inv_dict = {
-            '=':None,
-            '+':None,
-            '-':None,
-            '*':None,
-            '/':None,
-            '^':None,
-            '=':None
+            '=':lambda inv_tree,right:node(
+                '=',right,inv_tree
+            ),
+            '+':lambda inv_tree,right:node(
+                '-',inv_tree,right
+            ),
+            '-':lambda inv_tree,right:node(
+                '+',inv_tree,right
+            ),
+            '*':lambda inv_tree,right:node(
+                '/',inv_tree,right
+            ),
+            '/':lambda inv_tree,right:node(
+                '*',inv_tree,right
+            ),
+            '^':lambda inv_tree,right:node(
+                '^',
+                inv_tree,
+                node(
+                    '/',
+                    node(1),
+                    right
+                )
+            )
         }
         right_inv_dict={
-            '=':None,
-            '+':None,
-            '-':None,
-            '*':None,
-            '/':None,
-            '^':None,
-            '!':None,
-            'exp':None,
-            'ln':None,
-            'sin':None,
-            'cos':None,
-            'tan':None,
-            'csc':None,
-            'sec':None,
-            'cot':None,
-            'asin':None,
-            'acos':None,
-            'atan':None,
+            '=':lambda inv_tree,left:node(
+                '=',left,inv_tree
+            ),
+            '+':lambda inv_tree,left:node(
+                '-',inv_tree,left
+            ),
+            '-':lambda inv_tree,left:node(
+                '-',left,inv_tree
+            ),
+            '*':lambda inv_tree,left:node(
+                '/',inv_tree,left
+            ),
+            '/':lambda inv_tree,left:node(
+                '/',left,inv_tree
+            ),
+            '^':lambda inv_tree,left:node(
+                '/',
+                node(
+                    'ln',
+                    right=inv_tree
+                ),
+                node(
+                    'ln',
+                    right=left
+                )
+            ),
+            '!':lambda inv_tree,left:node(
+                '!',
+                right=inv_tree
+            ),
+            'exp':lambda inv_tree,left:node(
+                'ln',
+                right=inv_tree
+            ),
+            'ln':lambda inv_tree,left:node(
+                'exp',
+                right=inv_tree
+            ),
+            'sin':lambda inv_tree,left:node(
+                'asin',
+                right=inv_tree
+            ),
+            'cos':lambda inv_tree,left:node(
+                'acos',
+                right=inv_tree
+            ),
+            'tan':lambda inv_tree,left:node(
+                'atan',
+                right=inv_tree
+            ),
+            'csc':lambda inv_tree,left:node(
+                'asin',
+                right=node(
+                    '/',
+                    node(1),
+                    inv_tree
+                )
+            ),
+            'sec':lambda inv_tree,left:node(
+                'acos',
+                right=node(
+                    '/',
+                    node(1),
+                    inv_tree
+                )
+            ),
+            'cot':lambda inv_tree,left:node(
+                'atan',
+                right=node(
+                    '/',
+                    node(1),
+                    inv_tree
+                )
+            ),
+            'asin':lambda inv_tree,left:node(
+                'sin',
+                right=inv_tree
+            ),
+            'acos':lambda inv_tree,left:node(
+                'cos',
+                right=inv_tree
+            ),
+            'atan':lambda inv_tree,left:node(
+                'tan',
+                right=inv_tree
+            )
         }
-        operator = tree.val
-        # can make this a mapping of lambda functions for commutable operations and single operators
+        
+        root=self.root
 
-        # Double operations that are non commutable
+        if var not in self.dir:
+            raise Exception(f'\'{var}\' not found in Expression')
 
-        if operator=='=':
-            if inv_root==None:
-                return tree.right if left else tree.left
+        path = self.dir[var][0] # if path is not specified takes the first path in dir
+
+        if root.val =='=':
+            inv_tree = root.right if path[0] else root.left
+            root = root.left if path[0] else root.right
+            path = path[1:]
+        else:
+            inv_tree = node(0)
+
+        for d in path:
+            if root.val not in right_inv_dict:
+                print(f'Operator {root.val} not found in list of invertable expressions')
+                return None
+
+            if d:
+                inv_tree = left_inv_dict[root.val](inv_tree,root.right)
+                root=root.left
             else:
-                return node('=',left = inv_root,right =tree.right if left else tree.left)
+                inv_tree = right_inv_dict[root.val](inv_tree,root.left)
+                root=root.right
 
-        elif operator=='+':
-            return node('-',left = inv_root,right = tree.right if left else tree.left)
+        if include_var:
+            inv_tree = node('=',node(var),inv_tree)
         
-        elif operator=='-':
-            if left:
-                return node('+',left = inv_root,right = tree.right)
-            return node('-',left = tree.left,right=inv_root)
-        
-        elif operator == '*':
-            return node('/',left = inv_root,right = tree.right if left else tree.left)
-        
-        elif operator=='/':
-            if left:
-                return node('*',left=inv_root,right=tree.right)
-
-            node('/',left=tree.left,right=inv_root)
-
-        elif operator == '^':
-            if left:
-                pow_node = node('/',left=node(1),right=tree.right)
-                return node('^',left=inv_root,right=pow_node)
-            
-            num = node('ln',right=inv_root)
-            den = node('ln',right=tree.left)
-            return node('/',left=num,right= den)
-        
-        
-        ## Inverting single operators below
-        # expressions of the form f(f(x))=a
-        # maps inversion step to get f(x) = f^-1(a)
-
-        inv_map = {
-            'sin':lambda a:node('asin',right=a),
-            'cos':lambda a:node('acos',right=a),
-            'tan':lambda a:node('atan',right=a),
-            'ln':lambda a:node('exp',right=a),
-            'exp':lambda a:node('ln',right = a),
-            '!':lambda a:node('!',right=a),
-            'csc':lambda a:node('asin',right=node('/',node(1),a)),
-            'sec':lambda a:node('acos',right=node('/',node(1),a)),
-            'cot':lambda a:node('atan',right=node('/',node(1),a))
-        }
-
-        if operator in inv_map:
-            return inv_map[operator](inv_root)
+        inv_tree = self._reduce(inv_tree)
+        return expr(root = inv_tree)
 
     def pD(self,var):
         root = self._partial_D_aux(self.root,var)
@@ -531,7 +574,7 @@ class expr:
         # below is a map of derivative rules written as da/dvar where left and right
         # nodes of a are assummed to be functions of var
         
-        d_map = {
+        d_map = {                   # df/dx where f(x)
             '+':lambda a,var: node( # f+g => f'+g'
                 '+',self._partial_D_aux(a.left,var),self._partial_D_aux(a.right,var)),
             '-':lambda a,var: node( # f-g => f'-g'
@@ -540,7 +583,7 @@ class expr:
                 '+',
                 left = node('*',self._partial_D_aux(a.left,var),a.right),
                 right = node('*',a.left,self._partial_D_aux(a.right,var))),
-            '/':lambda a,var:node( # f/g => (f'*g-f*g')/(g^2)
+            '/':lambda a,var:node(  # f/g => (f'*g-f*g')/(g^2)
                 '/',
                 left=node(
                   '-',
@@ -552,17 +595,17 @@ class expr:
 
             '^':lambda a,var:self._power_D(a,var), ## general formula for f^g was too hairy for lambda function
 
-            'sin':lambda a,var:node( # sin(f)=> f'*cos(f)
+            'sin' :lambda a,var:node( # sin(f)=> f'*cos(f)
                 '*',
                 left = self._partial_D_aux(a.right,var),
                 right = node('cos',right=a.right)
             ),
-            'cos':lambda a,var:node( # cos(f)=> -f'*sin(f)
+            'cos' :lambda a,var:node( # cos(f)=> -f'*sin(f)
                 '*',
                 left = node('*',node(-1),self._partial_D_aux(a.right,var)),
                 right = node('sin',node(a.right))
             ),
-            'tan':lambda a,var:node( # tan(f)=> f'*sec(f)^2
+            'tan' :lambda a,var:node( # tan(f)=> f'*sec(f)^2
                 '*',
                 left = self._partial_D_aux(a.right,var),
                 right=node(
@@ -570,7 +613,7 @@ class expr:
                     left = node('sec',right=a.right),
                     right = node(2))
             ),
-            'csc':lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
+            'csc' :lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
                 '*',
                 node(-1),
                 node(
@@ -583,7 +626,7 @@ class expr:
                     )
                 )
             ),
-            'cot':lambda a,var:node(  # cot(f) => -f'*csc(f)^2
+            'cot' :lambda a,var:node( # cot(f) => -f'*csc(f)^2
                 '*',
                 node(-1),
                 node(
@@ -643,9 +686,9 @@ class expr:
                     )
                 )
             ),
-            'exp':lambda a,var: node( # exp(f) => f'*exp(f)
+            'exp' :lambda a,var:node( # exp(f) => f'*exp(f)
                 '*',left=self._partial_D_aux(a.right,var),right=a),
-            '=':lambda a,var:node( # f=g => f'=g'
+            '='   :lambda a,var:node( # f=g => f'=g'
                 '=',
                 self._partial_D_aux(a.left,var),
                 self._partial_D_aux(a.right,var)
@@ -797,20 +840,15 @@ def _tokenize(input_str:str)->list:
         '<',
         '<=',
         '!',
-        'cos',
-        'sin',
-        'tan',
-        'sec',
-        'csc',
-        'cot',
-        'asin',
-        'acos',
-        'atan',
         'ln',
         ','
     ]
+    # trig functions and single argument expresssions
+    # are implicitly tokenized if used correctly in an expression
+
     for e in exp_list:
         input_str = input_str.replace(e,' '+e+' ')
+    input_str = ' '+input_str
     
     tokenize_str = [val for val in input_str.split(' ') if val!='']
 
