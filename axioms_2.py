@@ -209,9 +209,9 @@ class expr:
         operator = {    # Operators with 2 inputs
             '+':lambda a,b: a+b,
             '-':lambda a,b: a-b,
-            '/':lambda a,b: a/b,
+            '/':lambda a,b: a/b if b!= 0 else None,
             '*':lambda a,b: a*b,
-            '^':lambda a,b: a**b,
+            '^':lambda a,b: a**b if (a and b)!=0 else None,
             '&':lambda a,b: a&b,
             '|':lambda a,b: a|b,
             '%':lambda a,b: a%b,
@@ -814,6 +814,44 @@ class expr:
             for left in path:
                 temp = temp.left if left else temp.right
             temp = root
+    
+    def simplify(self):
+        pass
+
+    def integrate(self,root,var):
+        # Integrating a constant
+        # Demo of a process to perform a symbolic intgration
+
+        special_cases = {
+            1:node(var)
+        }
+
+        if root.var in special_cases:
+            return special_cases[root.var]
+
+        root = self.root
+        
+        if root.right==None:    # .right is only None in the case of a constant var
+            
+            pass
+    
+    def _integrate_expand(self, root,var):
+        # expands an expression so that it can directly be mapped to an integral
+
+        if type(root.val) in [int,float,complex]:
+            return node(
+                '+',
+                node(
+                    '*',
+                    node(1),
+                    node(var)
+                ),
+                node(
+                    '*',
+                    node(var),
+                    node(0)
+                )
+            )
 
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
