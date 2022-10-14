@@ -202,12 +202,9 @@ class Exp(ExpBase):
             root = self.root
 
         if root.val in Exp.funcs:
-            # the arguments for the arbitrary function are a list of tokenized operators
-            argv = ''
-            for op in root.right.val[0]:
-                argv += op
+            # the arguments for the arbitrary function are a list of the parameters (split by comma)
+            argv = root.right.val
 
-            argv = root.right.val.split(',')
             expr = Exp.funcs[root.val](argv, env)
 
             # splice in the root of the new expression at this node.

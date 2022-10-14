@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from axioms_2 import exp
 import sys
 from PySide6 import QtCore, QtWidgets, QtGui
 import command_line
@@ -31,6 +30,9 @@ class State:
         self.command_buffer = [] # commands which need to be processed
         self.output_buffer = [] # lines which need to be printed to the screen
 
+        self.command_history = [] # list of commands which were entered by the user.
+        self.command_history_index = 0 # this is the current place in the command history
+
         Command.state = self
 
     def print(self, txt):
@@ -38,11 +40,14 @@ class State:
 
     def process_cmd(self):
         cmd = self.command_buffer.pop()
+        self.command_history.append(cmd)
+        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
 
         if cmd is None:
             return
 
         # determine if output should be supressed
+        # BUG if enter is pressed without anything, this crashes the program
         suppress_output = False
         if cmd[-1] == ';':
             suppress_output = True
@@ -64,6 +69,7 @@ class State:
         output = ''
         if argv[0] in Command.commands:
             output = Command.commands[argv[0]].callback(argv)
+
         else:
             output = ('"' + argv[0] + '" is not a recognized command or script.')
 
@@ -73,6 +79,59 @@ class State:
         else:
             self.print(output)
 
+
+
+class KeyEventHandler(QtCore.QObject):
+    def __init__(self, window):
+        self.window = window
+        self.state = window.state
+        self.cmd_input = window.cmd_input
+
+        super().__init__(window)
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent):
+        UP_ARROW = 16777235
+        DOWN_ARROW = 16777237
+        if event.type() == QtCore.QEvent.KeyPress:
+            key_event = QtGui.QKeyEvent(event)
+
+            # helper variables to make code more readable
+            history = self.state.command_history
+            index = self.state.command_history_index
+
+            if key_event.key() == UP_ARROW:
+                # cover the case when you type something and then want to go back
+                #  store the last typed command on the history buffer fist
+                if index == len(history) and self.cmd_input.text() != '':
+                    self.state.command_history.append(self.cmd_input.text())
+
+                if index > 0:
+                    self.state.command_history_index -= 1
+                    self.cmd_input.setText(self.state.command_history[self.state.command_history_index])
+                print('after up arrow:')
+                print('hist len', len(self.state.command_history))
+                print('hist ind', self.state.command_history_index)
+                print()
+
+            elif key_event.key() == DOWN_ARROW:
+                if index < len(history) and index != len(history) - 1:
+                    self.state.command_history_index += 1
+                    self.cmd_input.setText(self.state.command_history[self.state.command_history_index])
+                elif index == len(history) - 1:
+                    self.state.command_history_index += 1
+                    self.cmd_input.clear()
+
+                print('after down arrow:')
+                print('hist len', len(self.state.command_history))
+                print('hist ind', self.state.command_history_index)
+                print()
+            else:
+                return QtCore.QObject.eventFilter(self, obj, event)
+
+            return True
+        else:
+            # standard event processing
+            return QtCore.QObject.eventFilter(self, obj, event)
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -108,16 +167,19 @@ for a list of available commands, type 'help'
         # connect signals/slots
         self.cmd_input.returnPressed.connect(self.on_enter)
 
+        ev = KeyEventHandler(self)
+        self.cmd_input.installEventFilter(ev)
+
         # load icons
         self.expression_list_icon = QtGui.QIcon()
         self.expression_list_icon.addFile("icons/expression_list_item.png")
-
 
     @QtCore.Slot()
     def on_enter(self):
         self.state.command_buffer.append(self.cmd_input.text())  # put command in line to be processed
         self.state.output_buffer.append(self.cmd_input.text())   # record command in output
         self.cmd_input.clear()
+
 
         self.state.process_cmd()
 
@@ -126,6 +188,9 @@ for a list of available commands, type 'help'
 
         self.state.output_buffer.clear()
         self.state.output_buffer.append('') # add a blank line for formatting
+
+        print('hist len', len(self.state.command_history))
+        print('hist ind', self.state.command_history_index)
 
         # update the list view
         self.environment_list.clear()
