@@ -930,17 +930,63 @@ def _tokenize(input_str:str)->list:
 def simplify(self,root):
     pass
 
-def _common_form(self,root):
+def _common_form(self):
     # Returns the root of a tree whose form follows
     # a+b+c+...
     # where a,b,c,... are of the form
     # d*e*f*...
-    # where def,... are of the form
+    # where d,e,f,... are of the form
     # d^(g)
     # Where g is of common form
-    
+    root = _remove_minus_divide(self.root)
+
 
     pass
+
+def _remove_minus_divide(root):
+    # Changes -(f)=> +(-1*f)
+    # Changes /f => *f^(-1)
+    if root==None:
+        return None
+
+    if root.val=='-':
+        root.val='+'
+        root.right = node(
+            '*',
+            node(-1),
+            root.right
+        )
+    if root.val=='/':
+        root.val='*'
+        root.right = node(
+            '^',
+            root.right,
+            node(-1)
+        )
+    
+    return node(root.val,_remove_minus_divide(root.left),_remove_minus_divide(root.right))
+    
+def distribute(root):
+    # After a remove_minus_divide
+    # expressions of the form a*(b+c)=> a*b+a*c
+    if root==None:
+        return None
+    
+    if root.val=='*':
+        if root.right.val=='+':
+            root = node(
+                '+',
+                node('*',root.left,root.right.left),
+                node('*',root.left,root.right.right)
+            )
+        elif root.left.val=='+':
+            root= node(
+                '+',
+                node('*',root.right,root.left.left),
+                node('*',root.right,root.left.right)
+            )
+    return node(root.val,distribute(root.left),distribute(root.right))
+    
 
 def _equals(self,root1,root2):
     if root1.val!=root2.val:
