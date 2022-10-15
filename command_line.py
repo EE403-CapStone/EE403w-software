@@ -71,7 +71,13 @@ class _set_expr(Command):
 
         Command.state.expressions[argv[1]] = expression
 
-        return('    ' + argv[1] + ' <- ' +  str(Command.state.expressions[argv[1]]))
+        output = ''
+        eval_result = expression.evaluate()
+        if eval_result != None:
+            output += '    ⍄ ' + str(eval_result) + '\n'
+
+        output += '    ' + argv[1] + ' <- ' +  str(Command.state.expressions[argv[1]])
+        return(output)
 
 class _list_expr(Command):
     def __init__(self):
@@ -151,13 +157,15 @@ class _eval(Command):
         exp.dir.clear()
         exp.map()
 
-        exp.evaluate()
 
-        # fix the variables
-        exp.dir.clear()
-        exp.map()
+        output = ''
+        eval_result = exp.evaluate()
+        if eval_result != None:
+            output += '    ⍄ ' + str(eval_result) + '\n'
 
-        return '    ' + argv[1] + ' <- ' + str(exp)
+
+        output += '    ' + argv[1] + ' <- ' + str(exp)
+        return(output)
 
 # register predefined commands.
 _set_expr()
