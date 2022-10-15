@@ -819,6 +819,7 @@ class expr:
         pass
 
     def integrate(self,root,var):
+        # TODO Not sure how to proceed with task
         # Integrating a constant
         # Demo of a process to perform a symbolic intgration
 
@@ -853,6 +854,41 @@ class expr:
                 )
             )
 
+    def taylor_series(self,var,a,depth):
+        # D is the expression that represents the current derivative
+        # Taylor series is defined as Sum(D^n(f(a))/n!*(x-a)^n) :Where D is a derivative operator
+        # Assumes xo is a leaf type
+        if depth<1:
+            raise Exception('Depth of taylor series needs to b greator than 1')
+        
+        temp = expr(root=self.root)
+        temp.replace(var,node(a))
+        root = node(
+            '+',
+            temp.root,
+            self._taylor_aux(temp.pD(var),var,a,depth-1,1)
+        )
+        return expr(root = root)
+
+    def _taylor_aux(self,f_prime,var,a,depth:int,n:int):
+        
+        next_d = f_prime.pD(var)
+        f_prime.replace(var,node(a))
+        polynomial = node(
+            '*',
+            node('/',f_prime.root,node(self._factorial(n))),
+            node(
+                '^',
+                node('-',node(var),node(a)),
+                node(n)
+            )
+        )
+        return node('+',polynomial,self._taylor_aux(next_d,var,a,depth-1,n+1)) if depth>0 else polynomial
+    
+    def _factorial(self,n):
+        if n==0:
+            return 1
+        return n*self._factorial(n-1)
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
     # For each reserved command replace it with comma it and comma delimiters and finally split by commas
@@ -860,7 +896,6 @@ def _tokenize(input_str:str)->list:
     >>> _tokenize('a+b')
     ['a', '+', 'b']
     """
-    delimiter = ' '
     exp_list = [
         '=',
         '(',
@@ -891,6 +926,33 @@ def _tokenize(input_str:str)->list:
     tokenize_str = [val for val in input_str.split(' ') if val!='']
 
     return tokenize_str
+
+def simplify(self,root):
+    pass
+
+def _common_form(self,root):
+    # Returns the root of a tree whose form follows
+    # a+b+c+...
+    # where a,b,c,... are of the form
+    # d*e*f*...
+    # where def,... are of the form
+    # d^(g)
+    # Where g is of common form
+    
+
+    pass
+
+def _equals(self,root1,root2):
+    if root1.val!=root2.val:
+        return False
+    elif root1.val==None and root2.val==None:
+        return True
+    
+    if self._equals(root1.left,root2.left) and self._equals(root1.right,root2.right):
+        return True
+    
+    return False
+
 
 class node:
     # Units of expression objects
