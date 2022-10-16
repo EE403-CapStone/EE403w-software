@@ -926,17 +926,17 @@ def equals(root1,root2):
     
     return False
         
-def reduce(self,root):
+def reduce(root):
         
         if isinstance(root.val,str) and root.right==None: #instances of variables 
             return root
         elif type(root.val) in [int,bool,complex,float]:
             return root
 
-        right = self._reduce(root.right)
+        right = reduce(root.right)
         left = None
         if root.left:
-            left = self._reduce(root.left)
+            left = reduce(root.left)
 
         if root.val=='+':
             if left.val ==0:
