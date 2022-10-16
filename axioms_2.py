@@ -868,7 +868,7 @@ def _common_form(self):
     # d^(g)
     # Where g is of common form
     root = _remove_minus_divide(self.root)
-    root = 
+    
     root = distribute(root)
 
     pass
@@ -917,11 +917,13 @@ def distribute(root):
             )
     return node(root.val,distribute(root.left),distribute(root.right))
 
-def _equals(self,root1,root2):
-    if root1.val!=root2.val:
+def equals(root1,root2):
+    if root1==None and root2==None:
+        return True
+    elif root1.val!=root2.val:
         return False
     
-    if self._equals(root1.left,root2.left) and self._equals(root1.right,root2.right):
+    if equals(root1.left,root2.left) and equals(root1.right,root2.right):
         return True
     
     return False
