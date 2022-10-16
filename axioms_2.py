@@ -36,6 +36,9 @@ class expr:
         if exp.count('(')!= exp.count(')'):
             raise Exception('Mismatched delimiters')
         
+        if '-^' in exp:
+            raise Exception('Cannot determine precendence of operators')
+        
         exp = exp.replace(' ','')       # Remove blank space
 
         # Need to check for incomplete expressions / errors in expressions
@@ -110,7 +113,7 @@ class expr:
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
-        elif len(op_list)==2 and isinstance(op_list[0],str) and op_list[0] in single_arg_operators: # Recognized single argument expressions
+        elif len(op_list)==2 and op_list[0] in single_arg_operators: # Recognized single argument expressions
             return node(op_list[0],right=self.list2tree(op_list[1]))
 
         elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):        # arbitrary function
@@ -703,78 +706,230 @@ class expr:
             return node(0)
         
         return d_map[root.val](root,var)
-
-
-    def _reduce(self,root):
         
-        if isinstance(root.val,str) and root.right==None: #instances of variables 
-            return root
-        elif type(root.val) in [int,bool,complex,float]:
-            return root
 
-        right = self._reduce(root.right)
-        left = None
-        if root.left:
-            left = self._reduce(root.left)
 
-        if root.val=='+':
-            if left.val ==0:
-                return right
-            elif right.val == 0:
-                return left
-        elif root.val=='-':
-            if right.val==0:
-                return left
-            elif left.val==0:
-                return node('*',node(-1),right)
+    def _power_D(self,root,var):# general formula for df/dx(f^g) where f and g are functions of x
+        f = root.left
+        g = root.right
         
-        elif root.val=='*':
-            e = str(expr(root=root))
+        # s1 = (g*f')/f
+        s1 = node(
+            '/',
+            left = node(
+                '*',
+                g,
+                self._partial_D_aux(f,var)
+            ),
+            right = f
+        )
+        # s2 = g'*ln(f)
+        s2 = node(
+            '*',
+            left = self._partial_D_aux(g,var),
+            right= node('ln',right=f)
+        )
 
-            if right.val==1:
-                return left
-            elif left.val==1:
-                return right
-            elif left.val==0 or right.val == 0:
-                return node(0)
+        s = node('+',s1,s2)
 
-        elif root.val == '/':
-            if right.val==1:
-                return left
-            if left.val==0:
-                return left
+        return node('*',left = s,right=root)
+
+    def _exp_classify():
+        # Classifying expressions for the purposes making decisions of how to integrate,
+        # and analyical or numerical solutions
+        pass
+
+    def replace(self,var:str, root):
+        for path in self.dir[var]:
+            temp = self.root
+            for left in path:
+                temp = temp.left if left else temp.right
+            temp = root
+    
+    def simplify(self):
+        pass
+
+    def integrate(self,root,var):
+        # TODO Not sure how to proceed with task
+        # Integrating a constant
+        # Demo of a process to perform a symbolic intgration
+
+        special_cases = {
+            1:node(var)
+        }
+
+        if root.var in special_cases:
+            return special_cases[root.var]
+
+        root = self.root
+        
+        if root.right==None:    # .right is only None in the case of a constant var
+            
             pass
-        
-        elif root.val=='exp':
-            if right.val==0:
-                return node(1)
-            if right.val=='ln':
-                return right.right
-        
-        elif root.val=='ln':
-            if right.val=='e':
-                return node(1)
-            elif right.val=='^' and right.left.val=='e':
-                return right.right
-            elif right.val=='exp':
-                return right.right            
+    
+    def _integrate_expand(self, root,var):
+        # expands an expression so that it can directly be mapped to an integral
 
-        elif root.val=='^':
-            if right.val==0 and left.val!=0:
-                return node(0)
-            elif left.val== (0) and right.val==(0):
-                raise Exception('Invalid expression 0^0')
-            elif left.val==1:
-                return node(1)
+        if type(root.val) in [int,float,complex]:
+            return node(
+                '+',
+                node(
+                    '*',
+                    node(1),
+                    node(var)
+                ),
+                node(
+                    '*',
+                    node(var),
+                    node(0)
+                )
+            )
+
+    def taylor_series(self,var,a,depth):
+        # D is the expression that represents the current derivative
+        # Taylor series is defined as Sum(D^n(f(a))/n!*(x-a)^n) :Where D is a derivative operator
+        # Assumes xo is a leaf type
+        if depth<1:
+            raise Exception('Depth of taylor series needs to b greator than 1')
         
-        elif root.val=='sin':
-            if right==0:
-                return right
-        elif root.val=='cos':
-            if right==0:
-                return node(1)
+        temp = expr(root=self.root)
+        temp.replace(var,node(a))
+        root = node(
+            '+',
+            temp.root,
+            self._taylor_aux(temp.pD(var),var,a,depth-1,1)
+        )
+        return expr(root = root)
+
+    def _taylor_aux(self,f_prime,var,a,depth:int,n:int):
         
-        return node(root.val,left,right)
+        next_d = f_prime.pD(var)
+        f_prime.replace(var,node(a))
+        polynomial = node(
+            '*',
+            node('/',f_prime.root,node(self._factorial(n))),
+            node(
+                '^',
+                node('-',node(var),node(a)),
+                node(n)
+            )
+        )
+        return node('+',polynomial,self._taylor_aux(next_d,var,a,depth-1,n+1)) if depth>0 else polynomial
+    
+    def _factorial(self,n):
+        if n==0:
+            return 1
+        return n*self._factorial(n-1)
+
+def _tokenize(input_str:str)->list:
+    # Tokenize a string into a list of the macro elements of the exp
+    # For each reserved command replace it with comma it and comma delimiters and finally split by commas
+    """
+    >>> _tokenize('a+b')
+    ['a', '+', 'b']
+    """
+    exp_list = [
+        '=',
+        '(',
+        ')',
+        '+',
+        '-',
+        '*',
+        '/',
+        '^',
+        '==',
+        '|',
+        '&',
+        '>',
+        '>=',
+        '<',
+        '<=',
+        '!',
+        'ln',
+        ','
+    ]
+    # trig functions and single argument expresssions
+    # are implicitly tokenized if used correctly in an expression
+
+    for e in exp_list:
+        input_str = input_str.replace(e,' '+e+' ')
+    input_str = ' '+input_str
+    
+    tokenize_str = [val for val in input_str.split(' ') if val!='']
+
+    return tokenize_str
+
+def simplify(self,root):
+    pass
+
+def _common_form(self):
+    # Returns the root of a tree whose form follows
+    # a+b+c+...
+    # where a,b,c,... are of the form
+    # d*e*f*...
+    # where d,e,f,... are of the form
+    # d^(g)
+    # Where g is of common form
+    root = _remove_minus_divide(self.root)
+    root = distribute(root)
+
+    pass
+
+def _remove_minus_divide(root):
+    # Changes -(f)=> +(-1*f)
+    # Changes /f => *f^(-1)
+    if root==None:
+        return None
+
+    if root.val=='-':
+        root.val='+'
+        root.right = node(
+            '*',
+            node(-1),
+            root.right
+        )
+    if root.val=='/':
+        root.val='*'
+        root.right = node(
+            '^',
+            root.right,
+            node(-1)
+        )
+    
+    return node(root.val,_remove_minus_divide(root.left),_remove_minus_divide(root.right))
+    
+def distribute(root):
+    # After a remove_minus_divide
+    # expressions of the form a*(b+c)=> a*b+a*c
+    if root==None:
+        return None
+    
+    if root.val=='*':
+        if root.right.val=='+':
+            root = node(
+                '+',
+                node('*',root.left,root.right.left),
+                node('*',root.left,root.right.right)
+            )
+        elif root.left.val=='+':
+            root= node(
+                '+',
+                node('*',root.right,root.left.left),
+                node('*',root.right,root.left.right)
+            )
+    return node(root.val,distribute(root.left),distribute(root.right))
+    
+
+def _equals(self,root1,root2):
+    if root1.val!=root2.val:
+        return False
+    elif root1.val==None and root2.val==None:
+        return True
+    
+    if self._equals(root1.left,root2.left) and self._equals(root1.right,root2.right):
+        return True
+    
+    return False
         
         
 
@@ -889,115 +1044,6 @@ class expr:
         if n==0:
             return 1
         return n*self._factorial(n-1)
-def _tokenize(input_str:str)->list:
-    # Tokenize a string into a list of the macro elements of the exp
-    # For each reserved command replace it with comma it and comma delimiters and finally split by commas
-    """
-    >>> _tokenize('a+b')
-    ['a', '+', 'b']
-    """
-    exp_list = [
-        '=',
-        '(',
-        ')',
-        '+',
-        '-',
-        '*',
-        '/',
-        '^',
-        '==',
-        '|',
-        '&',
-        '>',
-        '>=',
-        '<',
-        '<=',
-        '!',
-        'ln',
-        ','
-    ]
-    # trig functions and single argument expresssions
-    # are implicitly tokenized if used correctly in an expression
-
-    for e in exp_list:
-        input_str = input_str.replace(e,' '+e+' ')
-    input_str = ' '+input_str
-    
-    tokenize_str = [val for val in input_str.split(' ') if val!='']
-
-    return tokenize_str
-
-def simplify(self,root):
-    pass
-
-def _common_form(self):
-    # Returns the root of a tree whose form follows
-    # a+b+c+...
-    # where a,b,c,... are of the form
-    # d*e*f*...
-    # where d,e,f,... are of the form
-    # d^(g)
-    # Where g is of common form
-    root = _remove_minus_divide(self.root)
-
-
-    pass
-
-def _remove_minus_divide(root):
-    # Changes -(f)=> +(-1*f)
-    # Changes /f => *f^(-1)
-    if root==None:
-        return None
-
-    if root.val=='-':
-        root.val='+'
-        root.right = node(
-            '*',
-            node(-1),
-            root.right
-        )
-    if root.val=='/':
-        root.val='*'
-        root.right = node(
-            '^',
-            root.right,
-            node(-1)
-        )
-    
-    return node(root.val,_remove_minus_divide(root.left),_remove_minus_divide(root.right))
-    
-def distribute(root):
-    # After a remove_minus_divide
-    # expressions of the form a*(b+c)=> a*b+a*c
-    if root==None:
-        return None
-    
-    if root.val=='*':
-        if root.right.val=='+':
-            root = node(
-                '+',
-                node('*',root.left,root.right.left),
-                node('*',root.left,root.right.right)
-            )
-        elif root.left.val=='+':
-            root= node(
-                '+',
-                node('*',root.right,root.left.left),
-                node('*',root.right,root.left.right)
-            )
-    return node(root.val,distribute(root.left),distribute(root.right))
-    
-
-def _equals(self,root1,root2):
-    if root1.val!=root2.val:
-        return False
-    elif root1.val==None and root2.val==None:
-        return True
-    
-    if self._equals(root1.left,root2.left) and self._equals(root1.right,root2.right):
-        return True
-    
-    return False
 
 
 class node:
