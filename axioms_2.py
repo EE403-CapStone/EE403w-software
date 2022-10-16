@@ -564,11 +564,9 @@ class expr:
 
     def pD(self,var):
         root = self._partial_D_aux(self.root,var)
-        root = self._reduce(root)
+        root = _reduce(root)
         return expr(root=root)
         
-
-        #reduce functionality
         
     def _partial_D_aux(self,root,var=''):
         if var=='':
@@ -705,8 +703,7 @@ class expr:
         elif root.right == None and root.val not in d_map or type(root) in [bool,int,float,complex]:
             return node(0)
         
-        return d_map[root.val](root,var)
-        
+        return d_map[root.val](root,var) 
 
 
     def _power_D(self,root,var):# general formula for df/dx(f^g) where f and g are functions of x
@@ -815,11 +812,11 @@ class expr:
             )
         )
         return node('+',polynomial,self._taylor_aux(next_d,var,a,depth-1,n+1)) if depth>0 else polynomial
-    
-    def _factorial(self,n):
-        if n==0:
-            return 1
-        return n*self._factorial(n-1)
+
+def _factorial(n):
+    if n==0:
+        return 1
+    return n*_factorial(n-1)
 
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
@@ -871,6 +868,7 @@ def _common_form(self):
     # d^(g)
     # Where g is of common form
     root = _remove_minus_divide(self.root)
+    root = 
     root = distribute(root)
 
     pass
@@ -918,7 +916,6 @@ def distribute(root):
                 node('*',root.right,root.left.right)
             )
     return node(root.val,distribute(root.left),distribute(root.right))
-    
 
 def _equals(self,root1,root2):
     if root1.val!=root2.val:
@@ -931,119 +928,6 @@ def _equals(self,root1,root2):
     
     return False
         
-        
-
-    def _power_D(self,root,var):# general formula for df/dx(f^g) where f and g are functions of x
-        f = root.left
-        g = root.right
-        
-        # s1 = (g*f')/f
-        s1 = node(
-            '/',
-            left = node(
-                '*',
-                g,
-                self._partial_D_aux(f,var)
-            ),
-            right = f
-        )
-        # s2 = g'*ln(f)
-        s2 = node(
-            '*',
-            left = self._partial_D_aux(g,var),
-            right= node('ln',right=f)
-        )
-
-        s = node('+',s1,s2)
-
-        return node('*',left = s,right=root)
-
-    def _exp_classify():
-        # Classifying expressions for the purposes making decisions of how to integrate,
-        # and analyical or numerical solutions
-        pass
-
-    def replace(self,var:str, root):
-        for path in self.dir[var]:
-            temp = self.root
-            for left in path:
-                temp = temp.left if left else temp.right
-            temp = root
-    
-    def simplify(self):
-        pass
-
-    def integrate(self,root,var):
-        # TODO Not sure how to proceed with task
-        # Integrating a constant
-        # Demo of a process to perform a symbolic intgration
-
-        special_cases = {
-            1:node(var)
-        }
-
-        if root.var in special_cases:
-            return special_cases[root.var]
-
-        root = self.root
-        
-        if root.right==None:    # .right is only None in the case of a constant var
-            
-            pass
-    
-    def _integrate_expand(self, root,var):
-        # expands an expression so that it can directly be mapped to an integral
-
-        if type(root.val) in [int,float,complex]:
-            return node(
-                '+',
-                node(
-                    '*',
-                    node(1),
-                    node(var)
-                ),
-                node(
-                    '*',
-                    node(var),
-                    node(0)
-                )
-            )
-
-    def taylor_series(self,var,a,depth):
-        # D is the expression that represents the current derivative
-        # Taylor series is defined as Sum(D^n(f(a))/n!*(x-a)^n) :Where D is a derivative operator
-        # Assumes xo is a leaf type
-        if depth<1:
-            raise Exception('Depth of taylor series needs to b greator than 1')
-        
-        temp = expr(root=self.root)
-        temp.replace(var,node(a))
-        root = node(
-            '+',
-            temp.root,
-            self._taylor_aux(temp.pD(var),var,a,depth-1,1)
-        )
-        return expr(root = root)
-
-    def _taylor_aux(self,f_prime,var,a,depth:int,n:int):
-        
-        next_d = f_prime.pD(var)
-        f_prime.replace(var,node(a))
-        polynomial = node(
-            '*',
-            node('/',f_prime.root,node(self._factorial(n))),
-            node(
-                '^',
-                node('-',node(var),node(a)),
-                node(n)
-            )
-        )
-        return node('+',polynomial,self._taylor_aux(next_d,var,a,depth-1,n+1)) if depth>0 else polynomial
-    
-    def _factorial(self,n):
-        if n==0:
-            return 1
-        return n*self._factorial(n-1)
 
 
 class node:
