@@ -920,8 +920,6 @@ def distribute(root):
 def _equals(self,root1,root2):
     if root1.val!=root2.val:
         return False
-    elif root1.val==None and root2.val==None:
-        return True
     
     if self._equals(root1.left,root2.left) and self._equals(root1.right,root2.right):
         return True
