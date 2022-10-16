@@ -868,8 +868,13 @@ def _common_form(self):
     root = _remove_minus_divide(root)
     root = reduce(root)
     root = distribute(root)
+    roots2sum = _summed_terms(root)
 
     pass
+def _summed_terms(root):
+    if root.val!='+':
+        return [root]
+    return _summed_terms(root.left)+_summed_terms(root.right)
 
 def _remove_minus_divide(root):
     # Changes -(f)=> +(-1*f)
