@@ -869,12 +869,35 @@ def _common_form(self):
     root = reduce(root)
     root = distribute(root)
     roots2sum = _summed_terms(root)
+    C = filter(lambda a:a!=None,[expr(root=term).evaluate() for term in roots2sum])
+    C = sum(C)                   # constant values are grouped to C
+    roots2sum = [term for term in roots2sum if expr.evaluate(root=term)==None]  # Filter out terms that can be combined to C
+    
+    for summand in roots2sum:
+        products = _product_terms(summand)
+        coefficient = sum([[expr(root=term).evaluate() for term in roots2sum]])
+        products = [p if p.val=='^' else node('^',p,node(1)) for p in products]
+        bases = [p.left for p in products]
+        powers = [p.right for p in products]
 
-    pass
+         
+        for i in range(len(bases)-1):
+            for j in range(i+1,len(bases)):
+
+                pass
+
+                
+        
+
 def _summed_terms(root):
     if root.val!='+':
         return [root]
     return _summed_terms(root.left)+_summed_terms(root.right)
+def _product_terms(root):
+    if root.val!='*':
+        return [root]
+    return _product_terms(root.left)+_product_terms(root.right)
+
 
 def _remove_minus_divide(root):
     # Changes -(f)=> +(-1*f)
