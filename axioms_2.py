@@ -24,7 +24,7 @@ class expr:
             self.root = self.exp2tree(kwargs['exp'])
         
         self.dir = {}
-        # self.map()
+        self.map()
 
     def exp2tree(self,exp):
         # Converts the raw string into a tree
@@ -736,12 +736,18 @@ class expr:
         # and analyical or numerical solutions
         pass
 
-    def replace(self,var:str, root):
-        for path in self.dir[var]:
-            temp = self.root
-            for left in path:
-                temp = temp.left if left else temp.right
-            temp = root
+    def replace(self,var:str, sub):
+        if var in self.dir:
+            for path in self.dir[var]:
+                temp = self.root
+                for left in path[:-1]:
+                    temp = temp.left if left else temp.right
+
+                if path[-1]:
+                    temp.left =sub
+                else:
+                    temp.right = sub
+        
     
     def simplify(self):
         pass
@@ -789,29 +795,31 @@ class expr:
         if depth<1:
             raise Exception('Depth of taylor series needs to b greator than 1')
         
-        temp = expr(root=self.root)
-        temp.replace(var,node(a))
+        temp = expr(root=_copy(self.root))
+        next_temp = temp.pD(var)
+        temp = expr(root=temp.replace(var,node(a)))
         root = node(
             '+',
             temp.root,
-            self._taylor_aux(temp.pD(var),var,a,depth-1,1)
+            self._taylor_aux(next_temp,var,a,depth-1,1)
         )
         return expr(root = root)
 
     def _taylor_aux(self,f_prime,var,a,depth:int,n:int):
         
-        next_d = f_prime.pD(var)
-        f_prime.replace(var,node(a))
+        temp = expr(root = _copy(f_prime.root))
+        next_temp = temp.pD(var)
+        temp = expr(root = temp.replace(var,node(a)))
         polynomial = node(
             '*',
-            node('/',f_prime.root,node(self._factorial(n))),
+            node('/',f_prime.root,node(_factorial(n))),
             node(
                 '^',
                 node('-',node(var),node(a)),
                 node(n)
             )
         )
-        return node('+',polynomial,self._taylor_aux(next_d,var,a,depth-1,n+1)) if depth>0 else polynomial
+        return node('+',polynomial,self._taylor_aux(next_temp,var,a,depth-1,n+1)) if depth>0 else polynomial
 
 def _factorial(n):
     if n==0:
@@ -967,6 +975,10 @@ def _product_terms(root):
         return [root]
     return _product_terms(root.left)+_product_terms(root.right)
 
+def _copy(root):
+    if root==None:
+        return None
+    return node(root.val,root.left,root.right)
 
 def _remove_minus_divide(root):
     # Changes -(f)=> +(-1*f)
