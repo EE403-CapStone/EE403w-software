@@ -6,6 +6,7 @@
 # undergraduates and professional engineers frequent
 
 import doctest
+from enum import unique
 import numpy as np
 
 class expr:
@@ -23,7 +24,7 @@ class expr:
             self.root = self.exp2tree(kwargs['exp'])
         
         self.dir = {}
-        self.map()
+        # self.map()
 
     def exp2tree(self,exp):
         # Converts the raw string into a tree
@@ -563,6 +564,7 @@ class expr:
     def pD(self,var):
         root = self._partial_D_aux(self.root,var)
         root = reduce(root)
+        root = common_form(root)
         return expr(root=root)
         
         
@@ -857,7 +859,7 @@ def _tokenize(input_str:str)->list:
 def simplify(self,root):
     pass
 
-def _common_form(self):
+def common_form(root):
     # Returns the root of a tree whose form follows
     # a+b+c+...
     # where a,b,c,... are of the form
@@ -866,28 +868,95 @@ def _common_form(self):
     # d^(g)
     # Where g is of common form
     root = _remove_minus_divide(root)
-    root = reduce(root)
     root = distribute(root)
     roots2sum = _summed_terms(root)
     C = filter(lambda a:a!=None,[expr(root=term).evaluate() for term in roots2sum])
     C = sum(C)                   # constant values are grouped to C
-    roots2sum = [term for term in roots2sum if expr.evaluate(root=term)==None]  # Filter out terms that can be combined to C
-    
+    roots2sum = [term for term in roots2sum if expr(root=term).evaluate()==None]  # Filter out terms that can be combined to C
+    if roots2sum==[]:
+        return node(C)
+
+    head_root = node('+')
+    flyer = head_root
+
     for summand in roots2sum:
         products = _product_terms(summand)
-        coefficient = sum([[expr(root=term).evaluate() for term in roots2sum]])
-        products = [p if p.val=='^' else node('^',p,node(1)) for p in products]
-        bases = [p.left for p in products]
-        powers = [p.right for p in products]
-
-         
-        for i in range(len(bases)-1):
-            for j in range(i+1,len(bases)):
-
-                pass
-
-                
         
+        var_products = []
+        coefficient = 1
+
+        for c in products:
+            term = expr(root=c).evaluate()
+            if term!=None:
+                coefficient*=term
+            else:
+                var_products.append(c)
+
+        var_products = [p if p.val=='^' else node('^',p,node(1)) for p in var_products]
+
+        bases = [p.left for p in var_products]
+        powers = [p.right for p in var_products]
+        
+        unique_base_indexes = {}
+
+        for i,base in enumerate(bases):
+            found = False
+            for ui in unique_base_indexes:
+                if equals(bases[ui],base):
+                    found = True
+                    unique_base_indexes[ui]+=[powers[i]]
+                    break
+            if not found:
+                unique_base_indexes[i]=[powers[i]]
+        
+        node_list = [node(coefficient)]
+        for ui in unique_base_indexes:
+            power = _summation(unique_base_indexes[ui])
+            power = common_form(power)
+            node_list+=[node('^',bases[ui],power)]
+        
+        flyer.left = _product(node_list)
+        flyer.right = node('+')
+        flyer = flyer.right
+
+    flyer.val = 0
+    head_root = reduce(head_root)
+    return head_root
+
+        
+def _summation(node_list):
+
+    if node_list==[]:
+        return node(0)
+    elif len(node_list)==1:
+        return node_list[0]
+    
+    head = node('+')
+    flyer = head
+    for n in node_list:
+        flyer.left = n
+        flyer.right = node('+')
+        flyer = flyer.right
+
+    flyer.val = 0
+    return head
+
+
+
+def _product(node_list):
+    if node_list==[]:
+        return node(1)
+    elif len(node_list)==1:
+        return node_list[0]
+
+    head = node('*')
+    flyer = head
+    for n in node_list:
+        flyer.left = n
+        flyer.right = node('*')
+        flyer = flyer.right
+    flyer.val = 1
+    return head
 
 def _summed_terms(root):
     if root.val!='+':
@@ -955,75 +1024,76 @@ def equals(root1,root2):
     return False
         
 def reduce(root):
-        
-        if isinstance(root.val,str) and root.right==None: #instances of variables 
-            return root
-        elif type(root.val) in [int,bool,complex,float]:
-            return root
+    if isinstance(root.val,str) and root.right==None: #instances of variables 
+        return root
+    elif type(root.val) in [int,bool,complex,float]:
+        return root
 
-        right = reduce(root.right)
-        left = None
-        if root.left:
-            left = reduce(root.left)
+    right = reduce(root.right)
+    left = None
+    if root.left:
+        left = reduce(root.left)
 
-        if root.val=='+':
-            if left.val ==0:
-                return right
-            elif right.val == 0:
-                return left
-        elif root.val=='-':
-            if right.val==0:
-                return left
-            elif left.val==0:
-                return node('*',node(-1),right)
-        
-        elif root.val=='*':
-            e = str(expr(root=root))
+    if root.val=='+':
+        if left.val ==0:
+            return right
+        elif right.val == 0:
+            return left
+    elif root.val=='-':
+        if right.val==0:
+            return left
+        elif left.val==0:
+            return node('*',node(-1),right)
+    
+    elif root.val=='*':
+        e = str(expr(root=root))
 
-            if right.val==1:
-                return left
-            elif left.val==1:
-                return right
-            elif left.val==0 or right.val == 0:
-                return node(0)
+        if right.val==1:
+            return left
+        elif left.val==1:
+            return right
+        elif left.val==0 or right.val == 0:
+            return node(0)
 
-        elif root.val == '/':
-            if right.val==1:
-                return left
-            if left.val==0:
-                return left
-            pass
-        
-        elif root.val=='exp':
-            if right.val==0:
-                return node(1)
-            if right.val=='ln':
-                return right.right
-        
-        elif root.val=='ln':
-            if right.val=='e':
-                return node(1)
-            elif right.val=='^' and right.left.val=='e':
-                return right.right
-            elif right.val=='exp':
-                return right.right            
+    elif root.val == '/':
+        if right.val==1:
+            return left
+        if left.val==0:
+            return left
+        pass
+    
+    elif root.val=='exp':
+        if right.val==0:
+            return node(1)
+        if right.val=='ln':
+            return right.right
+    
+    elif root.val=='ln':
+        if right.val=='e':
+            return node(1)
+        elif right.val=='^' and right.left.val=='e':
+            return right.right
+        elif right.val=='exp':
+            return right.right            
 
-        elif root.val=='^':
-            if right.val==0 and left.val!=0:
-                return node(0)
-            elif left.val== (0) and right.val==(0):
-                raise Exception('Invalid expression 0^0')
-            elif left.val==1:
-                return node(1)
-        
-        elif root.val=='sin':
-            if right==0:
-                return right
-        elif root.val=='cos':
-            if right==0:
-                return node(1)
-        
-        return node(root.val,left,right)
+    elif root.val=='^':
+        if right.val==0 and left.val!=0:
+            return node(0)
+        elif left.val== (0) and right.val==(0):
+            raise Exception('Invalid expression 0^0')
+        elif left.val==1:
+            return node(1)
+        elif right.val==1:
+            return left
+    
+    elif root.val=='sin':
+        if right==0:
+            return right
+    elif root.val=='cos':
+        if right==0:
+            return node(1)
+    
+    return node(root.val,left,right)
 
 class node:
     # Units of expression objects
