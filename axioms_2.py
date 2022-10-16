@@ -5,8 +5,6 @@
 # This is for the purposes of automating symbolic math operations that 
 # undergraduates and professional engineers frequent
 
-
-from ast import Pass, operator
 import doctest
 import numpy as np
 
@@ -559,12 +557,12 @@ class expr:
         if include_var:
             inv_tree = node('=',node(var),inv_tree)
         
-        inv_tree = self._reduce(inv_tree)
+        inv_tree = reduce(inv_tree)
         return expr(root = inv_tree)
 
     def pD(self,var):
         root = self._partial_D_aux(self.root,var)
-        root = _reduce(root)
+        root = reduce(root)
         return expr(root=root)
         
         
@@ -867,8 +865,8 @@ def _common_form(self):
     # where d,e,f,... are of the form
     # d^(g)
     # Where g is of common form
-    root = _remove_minus_divide(self.root)
-    
+    root = _remove_minus_divide(root)
+    root = reduce(root)
     root = distribute(root)
 
     pass
@@ -928,7 +926,76 @@ def equals(root1,root2):
     
     return False
         
+def reduce(self,root):
+        
+        if isinstance(root.val,str) and root.right==None: #instances of variables 
+            return root
+        elif type(root.val) in [int,bool,complex,float]:
+            return root
 
+        right = self._reduce(root.right)
+        left = None
+        if root.left:
+            left = self._reduce(root.left)
+
+        if root.val=='+':
+            if left.val ==0:
+                return right
+            elif right.val == 0:
+                return left
+        elif root.val=='-':
+            if right.val==0:
+                return left
+            elif left.val==0:
+                return node('*',node(-1),right)
+        
+        elif root.val=='*':
+            e = str(expr(root=root))
+
+            if right.val==1:
+                return left
+            elif left.val==1:
+                return right
+            elif left.val==0 or right.val == 0:
+                return node(0)
+
+        elif root.val == '/':
+            if right.val==1:
+                return left
+            if left.val==0:
+                return left
+            pass
+        
+        elif root.val=='exp':
+            if right.val==0:
+                return node(1)
+            if right.val=='ln':
+                return right.right
+        
+        elif root.val=='ln':
+            if right.val=='e':
+                return node(1)
+            elif right.val=='^' and right.left.val=='e':
+                return right.right
+            elif right.val=='exp':
+                return right.right            
+
+        elif root.val=='^':
+            if right.val==0 and left.val!=0:
+                return node(0)
+            elif left.val== (0) and right.val==(0):
+                raise Exception('Invalid expression 0^0')
+            elif left.val==1:
+                return node(1)
+        
+        elif root.val=='sin':
+            if right==0:
+                return right
+        elif root.val=='cos':
+            if right==0:
+                return node(1)
+        
+        return node(root.val,left,right)
 
 class node:
     # Units of expression objects
