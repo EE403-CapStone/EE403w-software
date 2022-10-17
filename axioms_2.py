@@ -24,7 +24,7 @@ class expr:
             self.root = self.exp2tree(kwargs['exp'])
         
         self.dir = {}
-        self.map()
+        # self.map()
 
     def exp2tree(self,exp):
         # Converts the raw string into a tree
@@ -736,7 +736,8 @@ class expr:
         # and analyical or numerical solutions
         pass
 
-    def replace(self,var:str, sub):
+    def replace_node(self,var:str, sub):
+        self.map()
         if var in self.dir:
             for path in self.dir[var]:
                 temp = self.root
@@ -747,6 +748,7 @@ class expr:
                     temp.left =sub
                 else:
                     temp.right = sub
+        
         
     
     def simplify(self):
@@ -797,7 +799,7 @@ class expr:
         
         temp = expr(root=_copy(self.root))
         next_temp = temp.pD(var)
-        temp = expr(root=temp.replace(var,node(a)))
+        temp.replace_node(var,node(a))
         root = node(
             '+',
             temp.root,
@@ -809,7 +811,7 @@ class expr:
         
         temp = expr(root = _copy(f_prime.root))
         next_temp = temp.pD(var)
-        temp = expr(root = temp.replace(var,node(a)))
+        temp.replace_node(var,node(a))
         polynomial = node(
             '*',
             node('/',f_prime.root,node(_factorial(n))),
