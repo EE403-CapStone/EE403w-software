@@ -60,10 +60,9 @@ class State:
 
         # check if this is the colon notation for set_expr
         # BUG if someone enters ':: some_expr' then weird things happen
-        # BUG if someone enters 'A:some_expr' it is not recognized as an expression
-        if argv[0][-1] == ':':
+        if argv[0].find(':') != -1:
             # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-            argv.insert(1, argv[0][:-1])
+            argv.insert(1, argv[0])
             argv[0] = ':'
 
         output = ''
