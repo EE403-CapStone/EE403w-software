@@ -59,7 +59,20 @@ class _set_expr(Command):
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
     def callback(argv:list) -> str:
-        # BUG argv[1] may not exist
+        print('argv0:', argv)
+        # handle colon operator syntax
+        if argv[0] == ':':
+            arg = argv[1].split(':') # separate expression name from the expression (ie. EXP:a+b=c)
+
+            if len(arg) == 1:
+                pass
+            else:
+                argv[1] = arg[0] # add the name of the expression to argument list
+                argv.insert(2, arg[1]) # add the first part of the expression to the argument list
+
+        if argv[0] == 'setexpr' and len(argv) <= 1:
+            return('Error: not supported!')
+
         if argv[1] == '':
             argv[1] = 'ans'
 
@@ -68,6 +81,7 @@ class _set_expr(Command):
             exp_str += e
 
         expression = Exp(exp_str)
+        print('argv1:', argv)
 
         Command.state.expressions[argv[1]] = expression
 
