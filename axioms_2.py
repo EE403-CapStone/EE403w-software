@@ -604,7 +604,7 @@ class expr:
             'cos' :lambda a,var:node( # cos(f)=> -f'*sin(f)
                 '*',
                 left = node('*',node(-1),self._partial_D_aux(a.right,var)),
-                right = node('sin',node(a.right))
+                right = node('sin',right = a.right)
             ),
             'tan' :lambda a,var:node( # tan(f)=> f'*sec(f)^2
                 '*',
@@ -799,7 +799,7 @@ class expr:
         
         temp = expr(root=_copy(self.root))
         next_temp = temp.pD(var)
-        temp.replace_node(var,node(a))
+        temp.replace_node(var,a)
         root = node(
             '+',
             temp.root,
@@ -811,13 +811,13 @@ class expr:
         
         temp = expr(root = _copy(f_prime.root))
         next_temp = temp.pD(var)
-        temp.replace_node(var,node(a))
+        temp.replace_node(var,a)
         polynomial = node(
             '*',
             node('/',f_prime.root,node(_factorial(n))),
             node(
                 '^',
-                node('-',node(var),node(a)),
+                node('-',node(var),a),
                 node(n)
             )
         )
@@ -888,7 +888,6 @@ def common_form(root):
 
     head_root = node('+')
     flyer = head_root
-
     for summand in roots2sum:
         products = _product_terms(summand)
         
@@ -906,7 +905,6 @@ def common_form(root):
 
         bases = [p.left for p in var_products]
         powers = [p.right for p in var_products]
-        
         unique_base_indexes = {}
 
         for i,base in enumerate(bases):
@@ -918,7 +916,7 @@ def common_form(root):
                     break
             if not found:
                 unique_base_indexes[i]=[powers[i]]
-                
+
         node_list = [node(coefficient)]
         for ui in unique_base_indexes:
             power = _summation(unique_base_indexes[ui])
@@ -928,8 +926,8 @@ def common_form(root):
         flyer.left = _product(node_list)
         flyer.right = node('+')
         flyer = flyer.right
-
-    flyer.val = 0
+    flyer.val = C
+    
     head_root = reduce(head_root)
     return head_root
 
@@ -1053,6 +1051,13 @@ def reduce(root):
             return right
         elif right.val == 0:
             return left
+        elif right.val=='*' and -1 in [right.right.val,right.left.val]:
+            sub_node = right.left if right.right.val==-1 else right.right
+            return node('-',left,sub_node)
+        elif left.val=='*' and -1 in [left.right.val,left.left.val]:
+            sub_node = left.left if left.right.val==-1 else left.right
+            return node('-',right,sub_node)
+        
     elif root.val=='-':
         if right.val==0:
             return left
@@ -1067,13 +1072,17 @@ def reduce(root):
             return right
         elif left.val==0 or right.val == 0:
             return node(0)
+        elif right.val== '^' and right.right.val==-1:
+            return node('/',left,right.left)
+        elif left.val== '^' and left.right.val==-1:
+            return node('/',right,left.left)
+        
 
     elif root.val == '/':
         if right.val==1:
             return left
         if left.val==0:
-            return left
-        pass
+            return node(0)
     
     elif root.val=='exp':
         if right.val==0:
