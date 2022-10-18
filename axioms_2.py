@@ -614,17 +614,26 @@ class expr:
                     left = node('sec',right=a.right),
                     right = node(2))
             ),
-            'csc' :lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
+            'csc' :lambda a,var:node( # cot(f) => -f'*csc(f)*cot(f)
                 '*',
                 node(-1),
                 node(
                     '*',
-                    node(self._partial_D_aux(a.right,var)),
+                    self._partial_D_aux(a.right,var),
                     node(
                         '*',
-                        node('csc',right=a),
-                        node('cot',right=a)
+                        node('csc',right=a.right),
+                        node('cot',right=a.right)
                     )
+                )
+            ),
+            'sec' :lambda a,var:node( # sec(f)=> f'*sec(f)*tan(f)
+                '*',
+                self._partial_D_aux(a.right,var),
+                node(
+                    '*',
+                    node('sec',right=a.right),
+                    node('tan',right=a.right)
                 )
             ),
             'cot' :lambda a,var:node( # cot(f) => -f'*csc(f)^2
@@ -635,43 +644,39 @@ class expr:
                     self._partial_D_aux(a.right,var),
                     node(
                         '^',
-                        node('csc',right=a),
+                        node('csc',right=a.right),
                         node(2)
                     )
                 )
             ),
             'asin':lambda a,var:node( # asin(f) => f'/sqrt(1-f^2)
+                '/',
+                self._partial_D_aux(a.right,var),
                 node(
-                    '/',
-                    self._partial_D_aux(a.right,var),
+                    '^',
                     node(
-                        '^',
-                        node(
-                            '-',
-                            node(1),
-                            node('^',a,node(2))
-                        ),
-                        node(1/2)
-                    )
+                        '-',
+                        node(1),
+                        node('^',a,node(2))
+                    ),
+                    node(1/2)
                 )
             ),
             'acos':lambda a,var:node( # acos(f) => -1*f'/sqrt(1-f^2)
+                '/',
                 node(
-                    '/',
+                    '*',
+                    node(-1),
+                    self._partial_D_aux(a.right,var)
+                ),
+                node(
+                    '^',
                     node(
-                        '*',
-                        node(-1),
-                        self._partial_D_aux(a.right,var)
+                        '-',
+                        node(1),
+                        node('^',a,node(2))
                     ),
-                    node(
-                        '^',
-                        node(
-                            '-',
-                            node(1),
-                            node('^',a,node(2))
-                        ),
-                        node(1/2)
-                    )
+                    node(1/2)
                 )
             ),
             'atan':lambda a,var:node( # atan(f) => f'/(1+f^2)
@@ -1036,7 +1041,7 @@ def equals(root1,root2):
     return False
         
 def reduce(root):
-    if isinstance(root.val,str) and root.right==None: #instances of variables 
+    if root.right==None and isinstance(root.val,str): #instances of variables 
         return root
     elif type(root.val) in [int,bool,complex,float]:
         return root
@@ -1107,6 +1112,8 @@ def reduce(root):
             return node(1)
         elif right.val==1:
             return left
+        elif right.val==-1:
+            return node('/',node(1),left)
     
     elif root.val=='sin':
         if right==0:
