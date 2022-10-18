@@ -801,7 +801,12 @@ class expr:
         # Assumes xo is a leaf type
         if depth<1:
             raise Exception('Depth of taylor series needs to b greator than 1')
-        
+            
+        if type(a) in [bool,int,float,complex]:
+            a = node(a)
+        elif isinstance(a,str):
+            a = expr(a).root
+    
         temp = expr(root=_copy(self.root))
         next_temp = temp.pD(var)
         temp.replace_node(var,a)
