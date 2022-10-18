@@ -918,7 +918,7 @@ def common_form(root):
                     break
             if not found:
                 unique_base_indexes[i]=[powers[i]]
-        
+                
         node_list = [node(coefficient)]
         for ui in unique_base_indexes:
             power = _summation(unique_base_indexes[ui])
@@ -1060,7 +1060,6 @@ def reduce(root):
             return node('*',node(-1),right)
     
     elif root.val=='*':
-        e = str(expr(root=root))
 
         if right.val==1:
             return left
