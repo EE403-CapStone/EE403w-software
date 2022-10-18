@@ -43,32 +43,41 @@ class State:
         self.command_history.append(cmd)
         self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
 
-        if cmd is None:
+        if cmd is None or cmd == '':
             return
 
         # determine if output should be supressed
-        # BUG if enter is pressed without anything, this crashes the program
         suppress_output = False
         if cmd[-1] == ';':
             suppress_output = True
             cmd = cmd[:-1]
 
-        # BUG error if there is leading whitespace
         argv = cmd.split(' ')
+
+        # remove blank tokens from superfluous whitespace
+        while argv.count('') != 0:
+            argv.remove('')
 
         # TODO the implied set_expr is not implemented yet.
 
-        # check if this is the colon notation for set_expr
-        # BUG if someone enters ':: some_expr' then weird things happen
-        if argv[0].find(':') != -1:
-            # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-            argv.insert(1, argv[0])
-            argv[0] = ':'
-
         output = ''
+        # check if this is the colon notation for set_expr
+        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
         if argv[0] in Command.commands:
             output = Command.commands[argv[0]].callback(argv)
-
+        elif argv[0].count(':') == 1:
+            argv.insert(0, ':')
+            output = Command.commands[argv[0]].callback(argv)
+        elif argv[1].count(':') == 1:
+            arg = argv[1].split(':')
+            if len(arg) > 2:
+                output = 'Error: malformed command'
+            elif arg[0] != '':
+                output = 'Error: malformed command'
+            else:
+                argv.insert(0, ':')
+                argv[2] = arg[1]
+                output = Command.commands[argv[0]].callback(argv)
         else:
             output = ('"' + argv[0] + '" is not a recognized command or script.')
 
@@ -77,7 +86,6 @@ class State:
             return
         else:
             self.print(output)
-
 
 
 class KeyEventHandler(QtCore.QObject):
