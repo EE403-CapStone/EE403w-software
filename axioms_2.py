@@ -17,14 +17,8 @@ class expr:
         if isinstance(exp,str):
             self.root = self.exp2tree(exp)
         
-        if 'root' in kwargs:
-            self.root = self.exp2tree(kwargs['roots'])
-        
-        if 'exp' in kwargs:
-            self.root = self.exp2tree(kwargs['exp'])
-        
         self.dir = {}
-        # self.map()
+        self.map()
 
     def exp2tree(self,exp):
         # Converts the raw string into a tree
@@ -604,7 +598,7 @@ class expr:
             'cos' :lambda a,var:node( # cos(f)=> -f'*sin(f)
                 '*',
                 left = node('*',node(-1),self._partial_D_aux(a.right,var)),
-                right = node('sin',right = a.right)
+                right = node('sin',node(a.right))
             ),
             'tan' :lambda a,var:node( # tan(f)=> f'*sec(f)^2
                 '*',
@@ -614,26 +608,17 @@ class expr:
                     left = node('sec',right=a.right),
                     right = node(2))
             ),
-            'csc' :lambda a,var:node( # cot(f) => -f'*csc(f)*cot(f)
+            'csc' :lambda a,var:node( # csc(f)=> -f'*csc(f)*cot(f)
                 '*',
                 node(-1),
                 node(
                     '*',
-                    self._partial_D_aux(a.right,var),
+                    node(self._partial_D_aux(a.right,var)),
                     node(
                         '*',
-                        node('csc',right=a.right),
-                        node('cot',right=a.right)
+                        node('csc',right=a),
+                        node('cot',right=a)
                     )
-                )
-            ),
-            'sec' :lambda a,var:node( # sec(f)=> f'*sec(f)*tan(f)
-                '*',
-                self._partial_D_aux(a.right,var),
-                node(
-                    '*',
-                    node('sec',right=a.right),
-                    node('tan',right=a.right)
                 )
             ),
             'cot' :lambda a,var:node( # cot(f) => -f'*csc(f)^2
@@ -644,39 +629,43 @@ class expr:
                     self._partial_D_aux(a.right,var),
                     node(
                         '^',
-                        node('csc',right=a.right),
+                        node('csc',right=a),
                         node(2)
                     )
                 )
             ),
             'asin':lambda a,var:node( # asin(f) => f'/sqrt(1-f^2)
-                '/',
-                self._partial_D_aux(a.right,var),
                 node(
-                    '^',
+                    '/',
+                    self._partial_D_aux(a.right,var),
                     node(
-                        '-',
-                        node(1),
-                        node('^',a,node(2))
-                    ),
-                    node(1/2)
+                        '^',
+                        node(
+                            '-',
+                            node(1),
+                            node('^',a,node(2))
+                        ),
+                        node(1/2)
+                    )
                 )
             ),
             'acos':lambda a,var:node( # acos(f) => -1*f'/sqrt(1-f^2)
-                '/',
                 node(
-                    '*',
-                    node(-1),
-                    self._partial_D_aux(a.right,var)
-                ),
-                node(
-                    '^',
+                    '/',
                     node(
-                        '-',
-                        node(1),
-                        node('^',a,node(2))
+                        '*',
+                        node(-1),
+                        self._partial_D_aux(a.right,var)
                     ),
-                    node(1/2)
+                    node(
+                        '^',
+                        node(
+                            '-',
+                            node(1),
+                            node('^',a,node(2))
+                        ),
+                        node(1/2)
+                    )
                 )
             ),
             'atan':lambda a,var:node( # atan(f) => f'/(1+f^2)
@@ -741,8 +730,7 @@ class expr:
         # and analyical or numerical solutions
         pass
 
-    def replace_node(self,var:str, sub):
-        self.map()
+    def replace(self,var:str, sub):
         if var in self.dir:
             for path in self.dir[var]:
                 temp = self.root
@@ -753,7 +741,6 @@ class expr:
                     temp.left =sub
                 else:
                     temp.right = sub
-        
         
     
     def simplify(self):
@@ -801,15 +788,10 @@ class expr:
         # Assumes xo is a leaf type
         if depth<1:
             raise Exception('Depth of taylor series needs to b greator than 1')
-            
-        if type(a) in [bool,int,float,complex]:
-            a = node(a)
-        elif isinstance(a,str):
-            a = expr(a).root
-    
+        
         temp = expr(root=_copy(self.root))
         next_temp = temp.pD(var)
-        temp.replace_node(var,a)
+        temp = expr(root=temp.replace(var,node(a)))
         root = node(
             '+',
             temp.root,
@@ -821,13 +803,13 @@ class expr:
         
         temp = expr(root = _copy(f_prime.root))
         next_temp = temp.pD(var)
-        temp.replace_node(var,a)
+        temp = expr(root = temp.replace(var,node(a)))
         polynomial = node(
             '*',
             node('/',f_prime.root,node(_factorial(n))),
             node(
                 '^',
-                node('-',node(var),a),
+                node('-',node(var),node(a)),
                 node(n)
             )
         )
@@ -898,6 +880,7 @@ def common_form(root):
 
     head_root = node('+')
     flyer = head_root
+
     for summand in roots2sum:
         products = _product_terms(summand)
         
@@ -915,6 +898,7 @@ def common_form(root):
 
         bases = [p.left for p in var_products]
         powers = [p.right for p in var_products]
+        
         unique_base_indexes = {}
 
         for i,base in enumerate(bases):
@@ -926,7 +910,7 @@ def common_form(root):
                     break
             if not found:
                 unique_base_indexes[i]=[powers[i]]
-
+        
         node_list = [node(coefficient)]
         for ui in unique_base_indexes:
             power = _summation(unique_base_indexes[ui])
@@ -936,8 +920,8 @@ def common_form(root):
         flyer.left = _product(node_list)
         flyer.right = node('+')
         flyer = flyer.right
-    flyer.val = C
-    
+
+    flyer.val = 0
     head_root = reduce(head_root)
     return head_root
 
@@ -1046,7 +1030,7 @@ def equals(root1,root2):
     return False
         
 def reduce(root):
-    if root.right==None and isinstance(root.val,str): #instances of variables 
+    if isinstance(root.val,str) and root.right==None: #instances of variables 
         return root
     elif type(root.val) in [int,bool,complex,float]:
         return root
@@ -1061,13 +1045,6 @@ def reduce(root):
             return right
         elif right.val == 0:
             return left
-        elif right.val=='*' and -1 in [right.right.val,right.left.val]:
-            sub_node = right.left if right.right.val==-1 else right.right
-            return node('-',left,sub_node)
-        elif left.val=='*' and -1 in [left.right.val,left.left.val]:
-            sub_node = left.left if left.right.val==-1 else left.right
-            return node('-',right,sub_node)
-        
     elif root.val=='-':
         if right.val==0:
             return left
@@ -1075,6 +1052,7 @@ def reduce(root):
             return node('*',node(-1),right)
     
     elif root.val=='*':
+        e = str(expr(root=root))
 
         if right.val==1:
             return left
@@ -1082,17 +1060,13 @@ def reduce(root):
             return right
         elif left.val==0 or right.val == 0:
             return node(0)
-        elif right.val== '^' and right.right.val==-1:
-            return node('/',left,right.left)
-        elif left.val== '^' and left.right.val==-1:
-            return node('/',right,left.left)
-        
 
     elif root.val == '/':
         if right.val==1:
             return left
         if left.val==0:
-            return node(0)
+            return left
+        pass
     
     elif root.val=='exp':
         if right.val==0:
@@ -1117,8 +1091,6 @@ def reduce(root):
             return node(1)
         elif right.val==1:
             return left
-        elif right.val==-1:
-            return node('/',node(1),left)
     
     elif root.val=='sin':
         if right==0:
