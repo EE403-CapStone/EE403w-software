@@ -38,7 +38,7 @@ class expr:
         # tokenizes the string expression into a list
         exp_list = _tokenize(exp)
         protected_string = ['(',')','=','<','>','<=','>=','+','-','*','/','^','&','|',]
-        
+
         # replaces recognized data with constants and throws errors for strings that cannot be interpreted
         exp_list = [val if val in protected_string else self._str2values(val) for val in exp_list]  
         
@@ -108,9 +108,8 @@ class expr:
         
         # expressions of length 2 are either a recognized single arg function or arbitrary function
         if len(op_list)==2:
-            # recognized expressions
-
-            if op_list[0]=='-':# negative operator is a special case that may occur
+            # negative operator is a special case that may occur
+            if op_list[0]=='-':
                 return node('*',node(-1),self.list2tree(op_list[1]))
 
             elif op_list[0] in single_arg_operators: # Recognized single argument expressions
@@ -122,57 +121,24 @@ class expr:
                 temp = ''.join(map(str,op_list[1][0]))      # recombines the list into a string
                 temp = temp.split(',')                      # splits the string arguments seperated by commas
                 return node(op_list[0],right = node(temp))  # returns a node of arbitrary operator operating on a node with val= to a list of arguments
-            
-        next_operator = self.next_operator(op_list)
+        
+        # special case of multiple operations led by a '-'
+        # replaces -a... with -1*a...
+        if op_list[0]=='-':
+            op_list[0:2] = [[-1,'*',op_list[1]]] 
 
-        val = op_list[next_operator]
-        left = self.list2tree(op_list[:next_operator])
-        right = self.list2tree(op_list[next_operator+1:])
+        # Determines the next operator which will operate left and right components
+        n_op = next_operator(op_list)
+
+        val = op_list[n_op]
+        left = self.list2tree(op_list[:n_op])      # Splicing and recursion to assign left and right pointers
+        right = self.list2tree(op_list[n_op+1:])   
 
         return node(val,left,right)
+
     
-    def next_operator(self,exp_list):
-        # Returns the index of the macro operation
-        # 'macro operation': if left and right components of the operation are grouped by parhentesis 
-        # it wouldn't change the expression. 'a $ b' = '(a) $ (b)', where a and b are 
-        # expressions and '$' is an operator
-        # ex. 
-        # next_operator('a+b*c') => 1
-        # a+b*c = (a)+(b*c)
-
-        operator = [
-            '=',
-            '|',
-            '&',
-            '!',
-            '+',
-            '-',
-            '%',
-            '*',
-            '/',
-            '^',
-            '==',
-            '<',
-            '<=',
-            '>',
-            '>=',
-            'cos',
-            'sin',
-            'tan',
-            'sec',
-            'csc',
-            'cot',
-            'asin',
-            'acos',
-            'atan',
-            'ln']
-
-        for op in operator:
-            if op in exp_list:
-                return exp_list.index(op)
-
     def compress_parhentesis(self,exp_list):
-
+        # algorithm that searches for the closing parhentesis of the first '('
         p1 = exp_list.index('(')   # left outermost parhentesis
         depth = 1
         for i,c in enumerate(exp_list[p1+1:]):
@@ -186,7 +152,8 @@ class expr:
         
         p2 = p1+i+1
 
-        exp_list[p1:p2+1] = [[exp_list[p1+1:p2]]]
+        # returns a list with the first and outermost parhentesis surpressed expression enclosed by a list
+        exp_list[p1:p2+1] = [[exp_list[p1+1:p2]]]   
         return exp_list
 
     def evaluate(self,root=None,val_dict:dict={}):
@@ -204,9 +171,18 @@ class expr:
 
         if root==None:
             root =self.root
+        
         # For when the root val type is in a value set return the raw value
         if type(root.val) in [bool,int,float,float,complex]:
             return root.val
+        
+        elif isinstance(root.val,str) and root.right==None:# Identified variable type
+            val_dict['pi'] = np.pi
+            val_dict['e'] = np.e
+            val_dict['i'] = 1j
+            if root.val in val_dict:
+                return val_dict[root.val]
+            return None
 
         operator = {    # Operators with 2 inputs
             '+':lambda a,b: a+b,
@@ -239,41 +215,38 @@ class expr:
             'exp': lambda a:np.exp(a)
         }
 
-        if isinstance(root.val,str) and root.val not in (operator or single_operators):# Identified variable type
-            val_dict['pi'] = np.pi
-            val_dict['e'] = np.e
-            val_dict['i'] = 1j
-            if root.val in val_dict:
-                return val_dict[root.val]
-            return None
-
+        # Given that val is an operation, node.right != None
         right = self.evaluate(root.right,val_dict=val_dict)
+        
+        # Special case of evaluating '='
 
         if root.val=='=': # '=' operator requires a little more complication
-            left = self.evaluate(root.left, val_dict=val_dict)
-            if type(left) or type(right) in [bool,int,float,float,complex]:
-                if left==None:
-                    return right
-                elif right==None:
-                    return left
-                elif right==left:
-                    return right
-                raise Exception('Invalid expression: '+str(self)) # Both left/right can be evaluated but are different
+            left = self.evaluate(root.left, val_dict=val_dict)  # '=' has left node that can be evaluated
 
-            return None # If neither left or right expresssions can be operated on
-
-        if right==None:
+            # If both sides can be evaluated check equivalence
+            if (left and right) in [bool,int,float,float,complex] and left!=right:
+                raise Exception('Invalid expression')
+            
+            # Return left or right if they are valued datatypes
+            elif type(left) in [bool,int,float,float,complex]:
+                return left
+            elif type(right) in [bool,int,float,float,complex]:
+                return right
+            
             return None
 
-        if root.val in single_operators:
+        if right==None: # Right must be real valued for an expression to be evaluated
+            return None
+
+        if root.val in single_operators:    # returns the respective value of the operation(value) for a single arg function
             return single_operators[root.val](right)
 
-        left = self.evaluate(root.left, val_dict=val_dict)
+        left = self.evaluate(root.left, val_dict=val_dict)  # Evaluate left sub expression to evaluate 2 arg expression ie '+'
 
         if root.val in operator:
             if left ==None:
                 return None
-            return operator[root.val](left,right)
+            return operator[root.val](left,right)   # maps root.val to the lambda operation in operator dict
 
     def display(self,root=None):
         # Purely for debugging purposes
@@ -331,7 +304,7 @@ class expr:
     def solve():
         pass
 
-    def map(self,base = None,d = []):
+    def map(self,base = None,path = []):
         # Sets the index of the variable to the value index
         # Returns a dict of 'variable' and [path] pairs
         # path is an ordered list of '1/0'
@@ -340,19 +313,28 @@ class expr:
         if base == None:
             base = self.root
 
-        if type(base.val) not in [bool,int,complex,float] and base.val not in '^*/%+-&|!<=>=':
+        if base.right==None and isinstance(base.val,str):    # Case in which base is a variable save the current path to self.dir
             if base.val not in self.dir:
-                self.dir[base.val] = []
-            self.dir[base.val].append(d)
+                self.dir[base.val] = []                      # Instantiate list for var
+            
+            if path not in self.dir[base.val]:      # only unique paths are added to self.dir for a given var
+                self.dir[base.val].append(path)     # Append current path
+            
         
+        # Include arbitrary functions in self.dir
         arbitrary_function = base.right!=None and isinstance(base.right.val,list)
 
         if not arbitrary_function:
             if base.left is not None:
-                self.map(base.left,d+[1])
+                self.map(base.left,path+[1])
 
             if base.right is not None:
-                self.map(base.right,d+[0])
+                self.map(base.right,path+[0])
+        
+        else: # aritrary function
+            if base.val not in self.dir:
+                self.dir[base.val] = []        # Instantiate list for var
+            self.dir[base.val].append(path)    # Append current path
 
     def __str__(self):
         # Returns a string expression that is an equivalent expression to the graph
@@ -363,7 +345,8 @@ class expr:
         a+b
         >>> print(expr('(a+b)*c'))
         (a+b)*c
-        """        
+        """
+        # initial call to _str_aux
         return self._str_aux(self.root)
 
     def _str_aux(self,base,last_operator = None):
@@ -396,6 +379,8 @@ class expr:
             'exp':6
         }
         
+        # Formats the tree to a string adding parhentesis to protect sub expressions as needed
+
         if base.val in single_op:
             return base.val+'('+self._str_aux(base.right)+')'
         elif isinstance(base.val,str) and base.left==None and base.right!=None: # Arbitrary functions
@@ -531,17 +516,20 @@ class expr:
         
         root=self.root
 
+
         if var not in self.dir:
             raise Exception(f'\'{var}\' not found in Expression')
 
         path = self.dir[var][0] # if path is not specified takes the first path in dir
-
+        C = 0 if self.evaluate()==None else self.evaluate() # seed to begin the inversion is either the current evaluation or 0
+        
+        # Case where the initial node is an equivalence operation
         if root.val =='=':
             inv_tree = root.right if path[0] else root.left
             root = root.left if path[0] else root.right
             path = path[1:]
         else:
-            inv_tree = node(0)
+            inv_tree = node(C)
 
         for d in path:
             if root.val not in right_inv_dict:
@@ -1106,6 +1094,52 @@ def reduce(root):
             return node(1)
     
     return node(root.val,left,right)
+
+def next_operator(exp_list):
+    # Returns the index of the macro operation
+    # 'macro operation': if left and right components of the operation are grouped by parhentesis 
+    # it wouldn't change the expression. 'a $ b' = '(a) $ (b)', where a and b are 
+    # expressions and '$' is an operator
+    # ex. 
+    '''
+    >>> from axioms_2 import *
+    >>> next_operator('a+b*c')
+    1
+    '''
+    #  => 1
+
+
+    operator = [
+        '=',
+        '|',
+        '&',
+        '!',
+        '+',
+        '-',
+        '%',
+        '*',
+        '/',
+        '^',
+        '==',
+        '<',
+        '<=',
+        '>',
+        '>=',
+        'cos',
+        'sin',
+        'tan',
+        'sec',
+        'csc',
+        'cot',
+        'asin',
+        'acos',
+        'atan',
+        'ln']
+
+    for op in operator:
+        if op in exp_list:
+            return exp_list.index(op)
+
 
 class node:
     # Units of expression objects
