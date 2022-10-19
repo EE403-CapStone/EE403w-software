@@ -528,7 +528,8 @@ class expr:
             inv_tree = root.right if path[0] else root.left
             root = root.left if path[0] else root.right
             path = path[1:]
-        else:
+
+        else:   # start the inversion with the seed C which is either 0 or self.evaluate()
             inv_tree = node(C)
 
         for d in path:
@@ -550,9 +551,11 @@ class expr:
         return expr(root = inv_tree)
 
     def pD(self,var):
+        # This process evaluates the derivative using dC/dx = 0, d(x)/dx = 1 and every mapping
+        # of a d(f)/dx where f is a function of x
         root = self._partial_D_aux(self.root,var)
         root = reduce(root)
-        root = common_form(root)
+        root = common_form(root)        # reduce and common_form make the expression tree readable by trimming "extra" information
         return expr(root=root)
         
         
@@ -725,6 +728,15 @@ class expr:
         pass
 
     def replace(self,var:str, sub):
+        # sub can be a root, val or string describing an expression
+        # nodes of var are replaced with the result of sub
+        if type(sub) in [bool,int,float,complex]:
+            sub = node(sub)
+        elif isinstance(sub,str):
+            sub = expr(sub)
+        
+        self.dir = {}   # reinstantiates dir to have most current map
+        self.map()
         if var in self.dir:
             for path in self.dir[var]:
                 temp = self.root
@@ -783,14 +795,15 @@ class expr:
         if depth<1:
             raise Exception('Depth of taylor series needs to b greator than 1')
         
-        temp = expr(root=_copy(self.root))
-        next_temp = temp.pD(var)
-        temp = expr(root=temp.replace(var,node(a)))
+        temp = expr(root=_copy(self.root))          # 0th derivative of self
+        next_temp = temp.pD(var)                    # 1st derivaive of self
+        temp = expr(root=temp.replace(var,a)) # replaces current var with a
         root = node(
             '+',
             temp.root,
             self._taylor_aux(next_temp,var,a,depth-1,1)
         )
+
         return expr(root = root)
 
     def _taylor_aux(self,f_prime,var,a,depth:int,n:int):
@@ -798,6 +811,7 @@ class expr:
         temp = expr(root = _copy(f_prime.root))
         next_temp = temp.pD(var)
         temp = expr(root = temp.replace(var,node(a)))
+        # Constructs current term in the summation
         polynomial = node(
             '*',
             node('/',f_prime.root,node(_factorial(n))),
@@ -807,9 +821,17 @@ class expr:
                 node(n)
             )
         )
-        return node('+',polynomial,self._taylor_aux(next_temp,var,a,depth-1,n+1)) if depth>0 else polynomial
+        if depth==0:
+            return polynomial
+        
+        # Recursively calls the next term of the series
+        return node(
+            '+',
+            polynomial,
+            self._taylor_aux(next_temp,var,a,depth-1,n+1))
 
 def _factorial(n):
+    # factorial is built on 0!=1 and n! = n*(n-1)!
     if n==0:
         return 1
     return n*_factorial(n-1)
@@ -846,7 +868,6 @@ def _tokenize(input_str:str)->list:
 
     for e in exp_list:
         input_str = input_str.replace(e,' '+e+' ')
-    input_str = ' '+input_str
     
     tokenize_str = [val for val in input_str.split(' ') if val!='']
 
@@ -863,13 +884,15 @@ def common_form(root):
     # where d,e,f,... are of the form
     # d^(g)
     # Where g is of common form
-    root = _remove_minus_divide(root)
+    root = _remove_minus_divide(root) # replace '-' with -1* and '/' with '^-1' to reduce sorting space
     root = distribute(root)
-    roots2sum = _summed_terms(root)
-    C = filter(lambda a:a!=None,[expr(root=term).evaluate() for term in roots2sum])
-    C = sum(C)                   # constant values are grouped to C
-    roots2sum = [term for term in roots2sum if expr(root=term).evaluate()==None]  # Filter out terms that can be combined to C
-    if roots2sum==[]:
+    roots2sum = _summed_terms(root)   # splices expression to a list of summands
+
+    C = filter(lambda a:a!=None,[expr(root=term).evaluate() for term in roots2sum]) # Filter of summable terms
+    C = sum(C)                                                                      # constant values are grouped to C
+    roots2sum = [term for term in roots2sum if expr(root=term).evaluate()==None]    # Filter out terms that cannot be combined to C
+    
+    if roots2sum==[]:   # returns C if it is the only term left
         return node(C)
 
     head_root = node('+')
@@ -915,26 +938,28 @@ def common_form(root):
         flyer.right = node('+')
         flyer = flyer.right
 
-    flyer.val = 0
+    flyer.val = C
     head_root = reduce(head_root)
     return head_root
 
         
 def _summation(node_list):
-
+    # special cases of empty and len==1 lists
     if node_list==[]:
         return node(0)
     elif len(node_list)==1:
         return node_list[0]
     
     head = node('+')
+    head.left = node_list[0]
     flyer = head
-    for n in node_list:
-        flyer.left = n
+    for n in node_list[1:-1]:
         flyer.right = node('+')
         flyer = flyer.right
+        flyer.left = n
 
-    flyer.val = 0
+    flyer.right = node_list[-1]
+    
     return head
 
 
