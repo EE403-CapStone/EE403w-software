@@ -23,7 +23,6 @@ class expr:
     def exp2tree(self,exp):
         # Converts the raw string into a tree
         # ex. list2tree('a+b')=> node(val='+', left=node('a'), right=node('b'))
-        
 
         # check for mismatched delimiters
         if exp.count('(')!= exp.count(')'):
@@ -38,15 +37,18 @@ class expr:
 
         # tokenizes the string expression into a list
         exp_list = _tokenize(exp)
-        exp_list = [self._str2values(val) for val in exp_list]
-        root = self.list2tree(exp_list)
-        return root
+        protected_string = ['(',')','=','<','>','<=','>=','+','-','*','/','^','&','|',]
+        
+        # replaces recognized data with constants and throws errors for strings that cannot be interpreted
+        exp_list = [val if val in protected_string else self._str2values(val) for val in exp_list]  
+        
+        return self.list2tree(exp_list) # returns thee root of a tree generated from the exp list
 
     def _str2values(self,s):
         # Converts a string to values that are recognized as either bool, int, float, complex
         # Where naming conventions match python 
 
-        special_cases = {
+        special_cases = {   # special strings that can be imediately recognized as constants
             '':None,
             'True':True,
             'False':False,
@@ -56,25 +58,21 @@ class expr:
         if s in special_cases:
             return special_cases[s]
 
-
-        iscomplex = s[-1]=='j'
+        if s[0].isalpha():  # if s begins with a character in the alphabet return s
+            return s
+        
+        # Now assumes string can be transformed to a some constant
+        iscomplex = s[-1]=='j'  # whether the number is complex or not
         s = s[:-1] if iscomplex else s
+
+        if s.count('.')==1: # float and complex float cases
+            return float(s)*1j if iscomplex else float(s)
         
-        if s.count('.')==1:
-            n,dec = s.split('.')
-            power = len(dec)
-            if n.isdigit() and dec.isdigit():
-                n,dec = map(float,[n,dec])
-                dec/=10**power
-                return (n+dec)*1j if iscomplex else n+dec
-        
-        if s.isdigit():
+        if s.isdigit():     # int and complex int cases
             return int(s)*1j if iscomplex else int(s)
         
-        if s[0].isdigit():
-            raise Exception(f'{s} is an invalid variable name')
-
-        return s+'j' if iscomplex else s
+        s = s+'j' if iscomplex else s   # If it has not been returned as a value or str throw an error
+        raise Exception(f'{s}: is not recognized as a valid value or function')
 
     def list2tree(self,op_list:list):
         # Converts a tokenized expression to a tree
@@ -93,29 +91,37 @@ class expr:
             'atan',
             '!',
             'exp',
-            'ln'
-            ]
+            'ln']
         
-        while '(' in op_list:           # compresses parhentesis protected expressions
+        # Compress parhentesis protected expressions into sublists(sub expressions) within the full expression
+        while '(' in op_list:
             op_list = self.compress_parhentesis(op_list)
         
+        # expressions of length 1 are either variables, vals or a list element with a sub expression
         if len(op_list)==1:
+            # variable or vals
             if type(op_list[0])in [str,bool, int, float, complex]:
                 return node(op_list[0])
-
+            # sub expressions
             elif type(op_list[0])==list:
                 return self.list2tree(op_list[0])
         
-        elif len(op_list)==2 and op_list[0] in single_arg_operators: # Recognized single argument expressions
-            return node(op_list[0],right=self.list2tree(op_list[1]))
+        # expressions of length 2 are either a recognized single arg function or arbitrary function
+        if len(op_list)==2:
+            # recognized expressions
 
-        elif len(op_list)==2 and isinstance(op_list[0],str) and isinstance(op_list[1],list):        # arbitrary function
-            temp = ''.join(map(str,op_list[1][0]))
-            temp = temp.split(',')
-            return node(op_list[0],right = node(temp))
-        
-        if op_list[0]=='-':            # case of -x
-            op_list[:2] = [-1,'*',op_list[1]]
+            if op_list[0]=='-':# negative operator is a special case that may occur
+                return node('*',node(-1),self.list2tree(op_list[1]))
+
+            elif op_list[0] in single_arg_operators: # Recognized single argument expressions
+                # returns op_list[0] operates on the expression or val of op_list[1]
+                return node(op_list[0],right=self.list2tree(op_list[1]))
+            
+            # arbitrary function case
+            elif isinstance(op_list[0],str) and isinstance(op_list[1],list):
+                temp = ''.join(map(str,op_list[1][0]))      # recombines the list into a string
+                temp = temp.split(',')                      # splits the string arguments seperated by commas
+                return node(op_list[0],right = node(temp))  # returns a node of arbitrary operator operating on a node with val= to a list of arguments
             
         next_operator = self.next_operator(op_list)
 
