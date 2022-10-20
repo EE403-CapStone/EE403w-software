@@ -15,13 +15,13 @@ class convo:
 
     return question
   
-  def test(self):
-    response = openai.Completion.create(
-    model="text-davinci-002",
-    prompt="Say hi I'm mathilda",
-    temperature=0.7,
-    max_tokens=256,
-    top_p=1,
-    frequency_penalty=0,
-    presence_penalty=0)
-    return response.choices[0].text
+def test_prompt():
+  response = openai.Completion.create(
+  model="text-davinci-002",
+  prompt="Say hi I'm mathilda",
+  temperature=0.7,
+  max_tokens=256,
+  top_p=1,
+  frequency_penalty=0,
+  presence_penalty=0)
+  return response.choices[0].text
