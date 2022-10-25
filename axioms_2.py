@@ -48,7 +48,7 @@ class expr:
         # Converts a string to values that are recognized as either bool, int, float, complex
         # Where naming conventions match python 
 
-        special_cases = {   # special strings that can be imediately recognized as constants
+        special_cases = {   # special strings that to return as constants
             '':None,
             'True':True,
             'False':False,
@@ -733,7 +733,7 @@ class expr:
         if type(sub) in [bool,int,float,complex]:
             sub = node(sub)
         elif isinstance(sub,str):
-            sub = expr(sub)
+            sub = expr(sub).root
         
         self.dir = {}   # reinstantiates dir to have most current map
         self.map()
@@ -797,7 +797,7 @@ class expr:
         
         temp = expr(root=_copy(self.root))          # 0th derivative of self
         next_temp = temp.pD(var)                    # 1st derivaive of self
-        temp = expr(root=temp.replace(var,a)) # replaces current var with a
+        temp.replace(var,a)                         # In the copy of self replace var with a
         root = node(
             '+',
             temp.root,
@@ -810,7 +810,7 @@ class expr:
         
         temp = expr(root = _copy(f_prime.root))
         next_temp = temp.pD(var)
-        temp = expr(root = temp.replace(var,node(a)))
+        temp.replace(var,a)
         # Constructs current term in the summation
         polynomial = node(
             '*',
