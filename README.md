@@ -23,5 +23,5 @@ when a command is entered, this static list stored in `Command` is queried, and 
 with the subclass can be gathered.
 
 ### Exp Class
-`exp` class is an extension of the axioms_2 `expr` class. `exp` in addition to everything that `expr` does, `exp`
+`Exp` class is an extension of the axioms_2 `expr` class. `Exp` in addition to everything that `expr` does, `Exp`
 allows previously defined expressions to be referenced in new expressions, through special functions.
