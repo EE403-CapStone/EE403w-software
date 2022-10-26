@@ -37,7 +37,7 @@ class expr:
 
         # tokenizes the string expression into a list
         exp_list = _tokenize(exp)
-        protected_string = ['(',')','=','<','>','<=','>=','+','-','*','/','^','&','|',]
+        protected_string = ['(',')','==','=','<','>','<=','>=','+','-','*','/','^','&','|']
 
         # replaces recognized data with constants and throws errors for strings that cannot be interpreted
         exp_list = [val if val in protected_string else self._str2values(val) for val in exp_list]  
@@ -793,11 +793,21 @@ def _factorial(n):
 
 def _tokenize(input_str:str)->list:
     # Tokenize a string into a list of the macro elements of the exp
-    # For each reserved command replace it with comma it and comma delimiters and finally split by commas
+    # For each reserved command replace it with itself padded. 
     """
     >>> _tokenize('a+b')
     ['a', '+', 'b']
+    >>> _tokenize('a==b')
+    ['a', '==', 'b']
+    >>> _tokenize('a==b=c')
+    ['a', '==', 'b', '=', 'c']
+    
     """
+    double_operators = [
+        '==',
+        '<=',
+        '>='
+    ]
     exp_list = [
         '=',
         '(',
@@ -807,24 +817,30 @@ def _tokenize(input_str:str)->list:
         '*',
         '/',
         '^',
-        '==',
         '|',
         '&',
         '>',
-        '>=',
         '<',
-        '<=',
         '!',
         'ln',
         ','
     ]
     # trig functions and single argument expresssions
     # are implicitly tokenized if used correctly in an expression
-
-    for e in exp_list:
+    initial_tokens = []
+    for e in double_operators:
         input_str = input_str.replace(e,' '+e+' ')
+    initial_tokens = input_str.split(' ')
+    tokenize_str = []
+    for token in initial_tokens:
+        if token in double_operators:
+            tokenize_str.append(token)
+            continue
+        for e in exp_list:
+            token = token.replace(e,' '+e+' ')
+        tokenize_str+= token.split(' ')
     
-    tokenize_str = [val for val in input_str.split(' ') if val!='']
+    tokenize_str = [val for val in tokenize_str if val!='']
 
     return tokenize_str
 
@@ -1151,9 +1167,6 @@ def next_operator(exp_list):
     >>> next_operator('a+b*c')
     1
     '''
-    #  => 1
-
-
     operator = [
         '=',
         '|',
