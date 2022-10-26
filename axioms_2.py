@@ -846,7 +846,7 @@ def common_form(root):
     C = filter(lambda a:a!=None,[expr(root=term).evaluate() for term in roots2sum]) # Filter of summable terms
     C = sum(C)                                                                      # constant values are grouped to C
     roots2sum = [term for term in roots2sum if expr(root=term).evaluate()==None]    # Filter out terms that cannot be combined to C
-    
+    final_roots2sum = []
     if roots2sum==[]:       # returns C if it is the only term left
         return node(C)
 
@@ -891,12 +891,22 @@ def common_form(root):
             node_list+=[node('^',bases[ui],power)]
         
         # indirect sort of node_list
-        str_node_list = np.array([str()])
-        
+        str_node_list = np.array([_str_aux(r) for r in node_list])
+        i_sort = np.argsort(str_node_list)
+        node_list = [node_list[i] for i in i_sort]  # sorts node list
+        product = _product(node_list)
 
-        flyer.left = _product(node_list)
-        flyer.right = node('+')
-        flyer = flyer.right
+        combined = False
+        for p in final_roots2sum(head_root):
+            if equals(p.right,product):
+                p.left.val+=coefficient
+                combined = True
+                break
+        
+        if combined:
+            continue
+
+        final_roots2sum+=[node('*',coefficient,product)]
 
     flyer.val = C
     head_root = reduce(head_root)
@@ -984,6 +994,8 @@ def _product(node_list):
     return head
 
 def _summed_terms(root):
+    if root==None:
+        return []
     if root.val!='+':
         return [root]
     return _summed_terms(root.left)+_summed_terms(root.right)
