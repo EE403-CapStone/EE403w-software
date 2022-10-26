@@ -865,7 +865,8 @@ def common_form(root):
                 coefficient*=term
             else:
                 var_products.append(c)
-
+        
+        var_products = [node('^',node('e'),n.right) if n.val=='exp' else n for n in var_products]   # replaces exp
         var_products = [p if p.val=='^' else node('^',p,node(1)) for p in var_products]
 
         bases = [p.left for p in var_products]
@@ -897,7 +898,7 @@ def common_form(root):
         product = _product(node_list)
 
         combined = False
-        for p in final_roots2sum(head_root):
+        for p in final_roots2sum:
             if equals(p.right,product):
                 p.left.val+=coefficient
                 combined = True
@@ -906,11 +907,12 @@ def common_form(root):
         if combined:
             continue
 
-        final_roots2sum+=[node('*',coefficient,product)]
+        final_roots2sum+=[node('*',node(coefficient),product)]
 
-    flyer.val = C
-    head_root = reduce(head_root)
-    return head_root
+    i_sort = np.argsort([_str_aux(n) for n in final_roots2sum])
+    final_roots2sum = [final_roots2sum[i] for i in i_sort]
+    temp = node('+',_summation(final_roots2sum),node(C))
+    return reduce(temp)
 
 def _str_aux(base,last_operator = None):
     # Auxillary equation of __str__
@@ -1126,6 +1128,8 @@ def reduce(root):
             return node(1)
         elif right.val==1:
             return left
+        elif left.val=='e':
+            return node('exp',right=right)
     
     elif root.val=='sin':
         if right==0:
