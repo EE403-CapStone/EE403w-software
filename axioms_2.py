@@ -1186,6 +1186,37 @@ def next_operator(exp_list):
             return exp_list.index(op)
 
 
+def integrate(root,var):
+    # If a form is recognized that can directly be integrated return the integrated form of the expression
+    if root.right==None and root.val!=var:  #root is a real_value or not var
+        # value_not_var => real value * var
+        return node('*',node(root.val),node(var))
+
+    if root.val==var:
+        # var=> 1/2*(var)^2
+        return node(
+            '*',
+            node(1/2),
+            node(
+                '^',
+                node(var),
+                node(2)
+            )
+        )
+    
+    if root.val=='+':
+        return node(
+            '+',
+            integrate(root.left),
+            integrate(root.right)
+        )
+
+    if root.val=='*':
+        # need to create an algorithm that can check if function is of form f'*g'(f) ie chain rule
+        pass
+
+
+
 class node:
     # Units of expression objects
     # Describes the structure of mathematical expressions in with 
