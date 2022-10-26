@@ -347,52 +347,7 @@ class expr:
         (a+b)*c
         """
         # initial call to _str_aux
-        return self._str_aux(self.root)
-
-    def _str_aux(self,base,last_operator = None):
-        # Auxillary equation of __str__
-        # Referenced locally so technical parameters are hidden that are used for recursive calls
-
-        op_order = {
-            '=':1,
-            '|':2,
-            '&':3,
-            '+':4,
-            '-':4,
-            '/':5,
-            '*':5,
-            '^':6
-            }
-
-        single_op = {
-            '!':6,
-            'sin':6,
-            'cos':6,
-            'tan':6,
-            'csc':6,
-            'sec':6,
-            'cot':6,
-            'asin':6,
-            'acos':6,
-            'atan':6,
-            'ln':6,
-            'exp':6
-        }
-        
-        # Formats the tree to a string adding parhentesis to protect sub expressions as needed
-
-        if base.val in single_op:
-            return base.val+'('+self._str_aux(base.right)+')'
-        elif isinstance(base.val,str) and base.left==None and base.right!=None: # Arbitrary functions
-            return base.val+'('+','.join(base.right.val)+')'
-
-        if base.val not in op_order:
-            return str(base.val)
-        
-        if last_operator and op_order[base.val]<op_order[last_operator]:
-            return '('+ self._str_aux(base.left,base.val)+base.val+self._str_aux(base.right,base.val)+')'
-
-        return self._str_aux(base.left,base.val) + base.val + self._str_aux(base.right,base.val)
+        return _str_aux(self.root)
 
     def invert_branch(self,var,include_var:bool=False):
         # Used for generating symbolic algebraic solutions to equations
@@ -892,19 +847,19 @@ def common_form(root):
     C = sum(C)                                                                      # constant values are grouped to C
     roots2sum = [term for term in roots2sum if expr(root=term).evaluate()==None]    # Filter out terms that cannot be combined to C
     
-    if roots2sum==[]:   # returns C if it is the only term left
+    if roots2sum==[]:       # returns C if it is the only term left
         return node(C)
 
-    head_root = node('+')
-    flyer = head_root
+    head_root = node('+')   # Instantiates the summation of terms
+    flyer = head_root       # flyer 'flies' to the right creating a '+' series
 
     for summand in roots2sum:
         products = _product_terms(summand)
         
         var_products = []
-        coefficient = 1
+        coefficient = 1     # Coefficient of summand term
 
-        for c in products:
+        for c in products:  # Filters out terms that can be combined into the coefficient
             term = expr(root=c).evaluate()
             if term!=None:
                 coefficient*=term
@@ -916,7 +871,7 @@ def common_form(root):
         bases = [p.left for p in var_products]
         powers = [p.right for p in var_products]
         
-        unique_base_indexes = {}
+        unique_base_indexes = {}    # unique bases indexes and a [] of their powers
 
         for i,base in enumerate(bases):
             found = False
@@ -928,12 +883,17 @@ def common_form(root):
             if not found:
                 unique_base_indexes[i]=[powers[i]]
         
-        node_list = [node(coefficient)]
+        # node_list = [node(coefficient)]
+        node_list = []
         for ui in unique_base_indexes:
             power = _summation(unique_base_indexes[ui])
             power = common_form(power)
             node_list+=[node('^',bases[ui],power)]
         
+        # indirect sort of node_list
+        str_node_list = np.array([str()])
+        
+
         flyer.left = _product(node_list)
         flyer.right = node('+')
         flyer = flyer.right
@@ -942,7 +902,51 @@ def common_form(root):
     head_root = reduce(head_root)
     return head_root
 
-        
+def _str_aux(base,last_operator = None):
+    # Auxillary equation of __str__
+    # Referenced locally so technical parameters are hidden that are used for recursive calls
+
+    op_order = {
+        '=':1,
+        '|':2,
+        '&':3,
+        '+':4,
+        '-':4,
+        '/':5,
+        '*':5,
+        '^':6
+        }
+
+    single_op = {
+        '!':6,
+        'sin':6,
+        'cos':6,
+        'tan':6,
+        'csc':6,
+        'sec':6,
+        'cot':6,
+        'asin':6,
+        'acos':6,
+        'atan':6,
+        'ln':6,
+        'exp':6
+    }
+    
+    # Formats the tree to a string adding parhentesis to protect sub expressions as needed
+
+    if base.val in single_op:
+        return base.val+'('+_str_aux(base.right)+')'
+    elif isinstance(base.val,str) and base.left==None and base.right!=None: # Arbitrary functions
+        return base.val+'('+','.join(base.right.val)+')'
+
+    if base.val not in op_order:
+        return str(base.val)
+    
+    if last_operator and op_order[base.val]<op_order[last_operator]:
+        return '('+ _str_aux(base.left,base.val)+base.val+_str_aux(base.right,base.val)+')'
+
+    return _str_aux(base.left,base.val) + base.val + _str_aux(base.right,base.val)
+
 def _summation(node_list):
     # special cases of empty and len==1 lists
     if node_list==[]:
