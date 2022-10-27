@@ -259,9 +259,21 @@ class Exp(ExpBase):
 
         return Exp(root=inverted_exp.root)
 
+    # argv[0]: EXPRESSION (from CLI namespace)
+    # argv[1]: VARIABLE (from expression in argv[0])
+    def _evaluate_pd(argv:list, env:dict):
+        exp = argv[0]
+        if exp not in env:
+            raise ExpFunctionError('pd', f'expression "{exp}" does not exist.')
+
+        derivative = env[exp].pD(argv[1])
+
+        return Exp(root=derivative.root)
+
     # these callbacks must be of the form
     #  callback(argv:list, env:dict) -> Exp
     funcs = {
         'invert': _evaluate_invert,
+        'pd': _evaluate_pd,
         'dummy': lambda : NotImplemented
     }
