@@ -37,7 +37,7 @@ class expr:
 
         # tokenizes the string expression into a list
         exp_list = _tokenize(exp)
-        protected_string = ['(',')','==','=','<','>','<=','>=','+','-','*','/','^','&','|']
+        protected_string = ['(',')','==','=','<','>','<=','>=','+','-','*','/','^','&','|',',']
 
         # replaces recognized data with constants and throws errors for strings that cannot be interpreted
         exp_list = [val if val in protected_string else self._str2values(val) for val in exp_list]  
