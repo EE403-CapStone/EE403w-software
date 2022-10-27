@@ -172,6 +172,9 @@ class expr:
         if root==None:
             root =self.root
         
+        if root!=None and isinstance(root.val,list): #arbitrary function case
+            return None
+
         # For when the root val type is in a value set return the raw value
         if type(root.val) in [bool,int,float,float,complex]:
             return root.val
@@ -216,6 +219,8 @@ class expr:
         }
 
         # Given that val is an operation, node.right != None
+
+
         right = self.evaluate(root.right,val_dict=val_dict)
         
         # Special case of evaluating '='
