@@ -349,7 +349,7 @@ class expr:
         # initial call to _str_aux
         return _str_aux(self.root)
 
-    def invert_branch(self,var,include_var:bool=False):
+    def invert_branch(self,var:str,include_var:bool=False):
         # Used for generating symbolic algebraic solutions to equations
         # inverts a particular path of the tree
         # generally used for inverting the path to a particular var
