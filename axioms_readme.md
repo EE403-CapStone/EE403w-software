@@ -1,20 +1,21 @@
-## Math Engine
+# axioms_2: The Math Engine
 
-The calculators runtime enviorment is an application to manipulate mathematical expressions. This enviorment has been split into 2 parts. The UX and a math engine. The UX calls upon the math engine to perform tasks that we define with custom syntax. This leaves the Math engine to physically carry out symbolic math operations. 
+The calculators runtime enviorment is an application to manipulate mathematical expressions. This enviorment has been split into 2 parts. A UX and a math engine. The UX calls upon the math engine to perform symbolic math operations that we define with custom syntax. This section covers the functionality of the math engine "axioms_2.py".
 
-This section will describe how the math engine can be used in a python enviorment.
+- [Initializing expressions](###Instantiating-an-expression-object)
+- [Evaluating expressions](##Evaluate)
+- [Inverting expresssions](##Inverting-expressions)
+- [Derivatives]()
+- [Common Form]()
 
-To import the math engine axioms_2 into a python enviorment
+## Introduction to expression graphs
 
-```python
-from axioms_2 import expr
-```
+"axioms_2.py" is a collection of functions and classes that work on binary trees. These trees and functions are analogous to symbolic math humans work with. Because axioms_2 is built heavily on binary trees it is helpful to know in general what a graph is and more specifically what a binary tree is. 
 
-expr is an object class with instance variable root. The value of root is the root node of an expression tree. One hurdle was converting a text expression into a directed graph. 
+- [Graphs](https://en.wikipedia.org/wiki/Graph_(discrete_mathematics))
+- [Binary Tree](https://en.wikipedia.org/wiki/Binary_tree)
 
-### Nodes and Math Expressions as directed graphs
-
-Math expressions can be described as directed graphs. An expression 'a+b' can be saved in memory as a directed graph as follows
+Math expressions can be described with binary trees. For example an expression $a+b$ can be saved as follows. 
 
 ```python
 class node:
@@ -24,10 +25,155 @@ class node:
         self.right = right
 
 root = node('+',left = node('a'), right = node('b'))
+'''
+ + 
+/ \
+a b
+'''
+```
+```root``` points to the base operation $+$ with left and right nodes $a$ and $b$. This structure can grow to save any arbitrary math expression. 
+
+
+## Quickstart
+
+To import the math engine axioms_2 into a python enviorment
+
+```python
+from axioms_2 import expr
 ```
 
-expr.__init__() automates this process so complex mathematical graphs can be instantiated with strings. This process replicates the PEMDOS order of operation. __init__() recognizes True, False, integers, floating point and complex values. Variables are recognized as anything that starts with a character that is not the reserved strings e, pi, j. e is Eulers number. pi is the ratio of circles diameter to it's circumfrence. 'j' is the $\sqrt{-1}$
+`expr` is an object class with instance variables `root` and `dir`. The value of `root` is the base node of an expression tree. `dir` is a dictionary, key value pairs are the variables and list of paths to each variable. 
+
+expr.__init__() automates defining the nodes and edges of the binary tree. This process replicates PEMDAS order of operation. Below is a figure demonstrating how __init__() decomposes a text expression into a binary tree. 
 
 ![](expression2graph.png)
 
-The above figure shows  
+The +quadratic formula is broken up into nodes and edges where nodes are operations that operate on left and right values. Left and right values are sub expressions. Eventually sub expressions are values that have no left or right nodes. 
+
+### Instantiating an expression object
+```python
+from axioms_2 import expr
+sum_ab = expr('a+b')
+sum_ab.display()
+'''
+ + 
+/ \
+a b
+'''
+print(sum_ab)
+'a+b'
+```
+Here it is also shown how the function `.display()` creates text art that helps visualize the binary tree that an ```expr``` object saves. An expression can also be printed as shown. Below is a table of operators and their descriptions.
+
+| Operation      | Description |
+| ----------- | -----------     |
+| =      | equivalency          |
+| +      | addition             |
+| -      | subtraction          |
+| *      | multiplication       |
+| /      | division             |
+| ^      | exponentiation       |
+| &      | logical and          |
+| \|      | logical or           |
+| <     | less than              |
+| <=    | less than equal to     |
+|>| greator than
+|>=| greator than equal to|
+|==| equal to|
+|( | left expression delimiter|
+|} | right expression delimiter|
+| f(x)| $f(x)$ notation|
+
+
+Noted that function notation $f(x)$ is recognized for any arbitrary function. However there are reserved and arbitrary functions. The reserved functions below are instantiated differently than arbitrary functions. The argument of a reserved function is decomposed into a binary tree. How arbitrary functions are handled is explained in [arbitrary function](###Arbitrary-function).
+
+| $f(x)$      | Description |
+| ----------- | -----------     |
+| exp(x)      | exponential()     |
+|ln(x)          | $ln(x)$|
+| sin(x)      | $sin(\theta)$|
+| cos(x)      | $cos(\theta)$|
+| tan(x)      | $tan(\theta)$|
+| csc(x)      | $csc(\theta)$|
+| sec(x)      | $sec(\theta)$|
+| cot(x)      | $cot(\theta)$|
+| asin(x)      | $arcsin(\theta)$|
+| acos(x)      | $arccos(\theta)$|
+| atan(x)      | $arctan(\theta)$|
+
+
+### Arbitrary function
+
+Parts of expressions that are formatted as ```"f(arg1,arg2)"``` are saved differently than reserved expressions. They are saved with the structure below.
+
+```python
+"f(arg1,arg2)"
+
+f = node(
+    'f',
+    right=node(['arg1','arg2']))
+```
+Above demonstrates how ```"f"``` is the val of a node with it's right pointer pointing to a node with val equal to a list of the comma seperated arguments
+
+This is demonstrated by the code below. 
+
+```powershell
+>>> from axioms_2 import expr
+>>> expr('f(arg1,arg2)').display()
+f________        
+         \       
+ ['arg1', 'arg2']
+
+```
+
+
+
+### Recognized values
+There are a few string values and formats that are recognized within expressions.
+
+
+Recognized values that are saved in a ```node.val```
+- "True" => ```True```
+- "False" => ```False```
+- "e"=> 2.71828... (eulers number)
+- "pi" =>  3.1415... ($\pi$)
+
+Where $a$ and $b$ are a string of digits (```a.isdigit() and b.isdigit()=>True```)
+- "a" => ```int(a)```
+- "a.b" =>  ```float(a.b)```
+- "a.bj" => ```complex(a.bj)```
+
+Structures
+- "-a" => -1*a
+- f(x) => ```node('f',right = node(x))```
+
+Variables
+
+Are any combination of alphanumeric values so long as it starts with a character. For example where "*" represents an alphanumeric str and "a" is a character. 
+
+- "a*" => a*
+
+
+## Evaluate
+```.evaluate()``` attempts to collapse a binary tree to a single value. If the expression tree cannot collapse ```.evaluate()``` returns ```None```. Variables can be evaluated as values if the keywarg ```val_dict``` is passed with keys and values defined as follows
+
+```val_dict = {'var':val}```
+
+Examples
+```powershell
+>>> from axioms_2 import expr
+>>> expr('1+2').evaluate()
+3
+>>> expr('a+b').evaluate()
+>>> expr('a+b').evaluate(val_dict = {'a':1,'b':2})
+3
+```
+
+## Inverting expressions
+```invert_branch()```This is a useful function that is roughly analogous to inverting a binary tree. However it differs in that it performs a mathematical inversion about a variable.
+
+Let's consider the following expression
+$$
+a+b=c
+$$
+
