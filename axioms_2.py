@@ -511,6 +511,7 @@ class expr:
         root = self._partial_D_aux(self.root,var)
         root = reduce(root)
         root = common_form(root)        # reduce and common_form make the expression tree readable by trimming "extra" information
+        root = reduce(root)
         return expr(root=root)
         
         
@@ -639,9 +640,13 @@ class expr:
                 '=',
                 self._partial_D_aux(a.left,var),
                 self._partial_D_aux(a.right,var)
+            ),
+            'ln':lambda a,var:node(
+                '/',
+                self._partial_D_aux(a.right,var),
+                a.right
             )
         }
-
 
         if root.val==var:
             return node(1)
@@ -677,10 +682,8 @@ class expr:
 
         return node('*',left = s,right=root)
 
-    def _exp_classify():
-        # Classifying expressions for the purposes making decisions of how to integrate,
-        # and analyical or numerical solutions
-        pass
+    def common_form(self):
+        return expr(root=common_form(self.root))
 
     def replace(self,var:str, sub):
         # sub can be a root, val or string describing an expression
@@ -940,25 +943,25 @@ def _str_aux(base,last_operator = None):
         '&':3,
         '+':4,
         '-':4,
-        '/':5,
+        '/':6,
         '*':5,
-        '^':6
+        '^':8
         }
 
-    single_op = {
-        '!':6,
-        'sin':6,
-        'cos':6,
-        'tan':6,
-        'csc':6,
-        'sec':6,
-        'cot':6,
-        'asin':6,
-        'acos':6,
-        'atan':6,
-        'ln':6,
-        'exp':6
-    }
+    single_op = [
+        '!',
+        'sin',
+        'cos',
+        'tan',
+        'csc',
+        'sec',
+        'cot',
+        'asin',
+        'acos',
+        'atan',
+        'ln',
+        'exp'
+    ]
     
     # Formats the tree to a string adding parhentesis to protect sub expressions as needed
 
@@ -1083,7 +1086,7 @@ def equals(root1,root2):
     return False
         
 def reduce(root):
-    if isinstance(root.val,str) and root.right==None: #instances of variables 
+    if root.right==None and isinstance(root.val,str): #instances of variables 
         return root
     elif type(root.val) in [int,bool,complex,float]:
         return root
@@ -1144,6 +1147,8 @@ def reduce(root):
             return node(1)
         elif right.val==1:
             return left
+        elif right.val==-1:
+            return node('/',node(1),left)
         elif left.val=='e':
             return node('exp',right=right)
     
