@@ -220,12 +220,12 @@ The form may look awkward but that's because ```.pD()``` takes advantage of [``c
 ## Taylor Expansion
 The Taylor function is an extension of the derivative function. For more information on [Taylor series](https://en.wikipedia.org/wiki/Taylor_series).
 
-<!-- 
-$$'
-\ taylor(var,a,depth) = \sum_{n=0}^{depth} \frac{f^n(a)}{n!} (x-a)^n  \
-$$ -->
 
-$`\ taylor(var,a,depth) = \sum_{n=0}^{depth} \frac{f^n(a)}{n!} (x-a)^n  \ `$
+$$
+\ taylor(var,a,depth) = \sum_{n=0}^{depth} \frac{f^n(a)}{n!} (x-a)^n  \
+$$
+
+
 ```expr.taylor_series(var,a,depth)```
 |Parameter| Description|
 |-----|------|
