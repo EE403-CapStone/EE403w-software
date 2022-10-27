@@ -170,10 +170,90 @@ Examples
 ```
 
 ## Inverting expressions
-```invert_branch()```This is a useful function that is roughly analogous to inverting a binary tree. However it differs in that it performs a mathematical inversion about a variable.
+```.invert_branch()```This is a useful function that is roughly analogous to inverting a binary tree. However it differs in that it performs a mathematical inversion about a variable.
 
 Let's consider the following expression
 $$
 a+b=c
 $$
+The nodes of variables "a" and "b" can be inverted to generate new expressions as described in the code below
 
+```python
+from axioms_2 import expr
+
+sum_ab = expr('a+b=c')
+a = sum_ab.invert_branch('a')
+b = sum_ab.invert_branch('b')
+
+print(a)
+"c-b"
+print(b,True)
+"b=c-a"
+```
+There are a few things to note. ```.invert_branch()``` inverts the first occurance of its's argument var in the expression. If the second parameter ```include_var``` is passed as ```True```. Then the returned expression will be saved as "var=...".
+Boolean operations cannot be inverted.
+
+## Derivatives
+This library has the ability to take [partial derivatives](https://en.wikipedia.org/wiki/Partial_derivative) of expressions.
+
+It should be noted that this is only for differentiable expressions. This does not include boolean expressions. 
+
+```expr.pD(var)```
+
+
+|Parameter| Description|
+|-----|------|
+|var | the variable for which to differentiate with respect to|
+
+```python
+from axioms_2 import *
+
+poly = expr('a*x^2+b*x+c')
+
+print(poly.pD('x'))
+'b+2*a*x'
+```
+The form may look awkward but that's because ```.pD()``` takes advantage of [``common_form()``](##Common-Form). 
+
+
+## Taylor Expansion
+As an extenstion of the derivative functionality. For more information on [Taylor series](https://en.wikipedia.org/wiki/Taylor_series).
+$$
+\ taylor(var,a,depth) = \sum_{n=0}^{depth} \frac{f^n(a)}{n!} (x-a)^n  \
+$$
+
+```expr.taylor_series(var,a,depth)```
+|Parameter| Description|
+|-----|------|
+|var | the variable for which to differentiate with respect to|
+|a   | the point at which to evaluate the derivative and offset the polynomial|
+|depth | how many terms of the series to include|
+
+The code below shows how an expression is expanded into a taylor series.
+
+```python
+from axioms_2 import expr
+
+poly = expr('a*x^2+b*x+c')
+print(poly.taylor_series('x','xo',2))
+
+'a*xo^2+b*xo+c+(b+2*a*xo)/1*(x-xo)^1+(2*a)/2*(x-xo)^2'
+```
+
+## Common Form
+Common form attempts to reduce expressions into more readable forms and perform a sort such that expressions that are equivalent via commutation and combination will be returned as exactly the same tree.
+
+```expr.common_form()```
+
+```python
+from axioms_2 import expr,equals
+
+poly1 = expr('a*x^2 + b*x + c')
+poly2 = expr('b*x + c + a*x^2')
+
+root1 = poly1.common_form().root
+root2 = poly2.common_form().root
+
+print(equals(root1,root2))
+'True'
+```
