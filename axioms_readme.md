@@ -1,12 +1,13 @@
 # axioms_2: The Math Engine
 
-The calculators runtime enviorment is an application to manipulate mathematical expressions. This enviorment has been split into 2 parts. A UX and a math engine. The UX calls upon the math engine to perform symbolic math operations that we define with custom syntax. This section covers the functionality of the math engine "axioms_2.py".
+The calculators' runtime environment is an application to manipulate mathematical expressions. This environment has been split into 2 parts. A UX and a math engine. The UX calls upon the math engine to perform symbolic math operations that we define with custom syntax. This section covers the functionality of the math engine "axioms_2.py".
 
 - [Initializing expressions](###Instantiating-an-expression-object)
 - [Evaluating expressions](##Evaluate)
 - [Inverting expresssions](##Inverting-expressions)
-- [Derivatives]()
-- [Common Form]()
+- [Derivatives](##Derivative)
+- [Taylor expansion](##Taylor-Expansion)
+- [Common Form](##Common-Form)
 
 ## Introduction to expression graphs
 
@@ -15,7 +16,7 @@ The calculators runtime enviorment is an application to manipulate mathematical 
 - [Graphs](https://en.wikipedia.org/wiki/Graph_(discrete_mathematics))
 - [Binary Tree](https://en.wikipedia.org/wiki/Binary_tree)
 
-Math expressions can be described with binary trees. For example an expression $a+b$ can be saved as follows. 
+Math expressions can be described with binary trees. For example, an expression $a+b$ can be saved as follows. 
 
 ```python
 class node:
@@ -36,19 +37,19 @@ a b
 
 ## Quickstart
 
-To import the math engine axioms_2 into a python enviorment
+To import the math engine axioms_2 into a python environment
 
 ```python
 from axioms_2 import expr
 ```
 
-`expr` is an object class with instance variables `root` and `dir`. The value of `root` is the base node of an expression tree. `dir` is a dictionary, key value pairs are the variables and list of paths to each variable. 
+`expr` is an object class with instance variables `root` and `dir`. The value of `root` is the base node of an expression tree. `dir` is a dictionary, with keys as variables and values as a list of paths to each variable. 
 
-expr.__init__() automates defining the nodes and edges of the binary tree. This process replicates PEMDAS order of operation. Below is a figure demonstrating how __init__() decomposes a text expression into a binary tree. 
+expr.__init__() automates defining the nodes and edges of the binary tree. This process replicates the PEMDAS order of operation. Below is a figure demonstrating how __init__() decomposes a text expression into a binary tree. 
 
 ![](expression2graph.png)
 
-The +quadratic formula is broken up into nodes and edges where nodes are operations that operate on left and right values. Left and right values are sub expressions. Eventually sub expressions are values that have no left or right nodes. 
+The +quadratic formula is broken up into nodes and edges where nodes are operations that operate on left and right values. Left and right values are sub-expressions. Eventually, sub-expressions are values that have no left or right nodes. 
 
 ### Instantiating an expression object
 ```python
@@ -77,15 +78,15 @@ Here it is also shown how the function `.display()` creates text art that helps 
 | \|      | logical or           |
 | <     | less than              |
 | <=    | less than equal to     |
-|>| greator than
-|>=| greator than equal to|
+|>| greater than
+|>=| greater than equal to|
 |==| equal to|
 |( | left expression delimiter|
 |} | right expression delimiter|
 | f(x)| $f(x)$ notation|
 
 
-Noted that function notation $f(x)$ is recognized for any arbitrary function. However there are reserved and arbitrary functions. The reserved functions below are instantiated differently than arbitrary functions. The argument of a reserved function is decomposed into a binary tree. How arbitrary functions are handled is explained in [arbitrary function](###Arbitrary-function).
+Noted that function notation $f(x)$ is recognized for any arbitrary function. However, there are reserved and arbitrary functions. The reserved functions below are instantiated differently than arbitrary functions. The argument of a reserved function is decomposed into a binary tree. How arbitrary functions are handled is explained in [arbitrary function](###Arbitrary-function).
 
 | $f(x)$      | Description |
 | ----------- | -----------     |
@@ -113,11 +114,11 @@ f = node(
     'f',
     right=node(['arg1','arg2']))
 ```
-Above demonstrates how ```"f"``` is the val of a node with it's right pointer pointing to a node with val equal to a list of the comma seperated arguments
+The above demonstrates how ```"f"``` is the val of a node with its right pointer pointing to a node with ```val``` equal to a list of the comma-separated arguments
 
 This is demonstrated by the code below. 
 
-```powershell
+```Powershell
 >>> from axioms_2 import expr
 >>> expr('f(arg1,arg2)').display()
 f________        
@@ -135,7 +136,7 @@ There are a few string values and formats that are recognized within expressions
 Recognized values that are saved in a ```node.val```
 - "True" => ```True```
 - "False" => ```False```
-- "e"=> 2.71828... (eulers number)
+- "e"=> 2.71828... (Euler's number)
 - "pi" =>  3.1415... ($\pi$)
 
 Where $a$ and $b$ are a string of digits (```a.isdigit() and b.isdigit()=>True```)
@@ -149,7 +150,7 @@ Structures
 
 Variables
 
-Are any combination of alphanumeric values so long as it starts with a character. For example where "*" represents an alphanumeric str and "a" is a character. 
+Are any combination of alphanumeric values so long as it starts with a character. For example, where "*" represents an alphanumeric str and "a" is a character. 
 
 - "a*" => a*
 
@@ -160,7 +161,7 @@ Are any combination of alphanumeric values so long as it starts with a character
 ```val_dict = {'var':val}```
 
 Examples
-```powershell
+```PowerShell
 >>> from axioms_2 import expr
 >>> expr('1+2').evaluate()
 3
@@ -170,7 +171,7 @@ Examples
 ```
 
 ## Inverting expressions
-```.invert_branch()```This is a useful function that is roughly analogous to inverting a binary tree. However it differs in that it performs a mathematical inversion about a variable.
+```.invert_branch()```This is a useful function that is roughly analogous to inverting a binary tree. However, it differs in that it performs a mathematical inversion of a variable.
 
 Let's consider the following expression
 $$
@@ -190,11 +191,11 @@ print(a)
 print(b,True)
 "b=c-a"
 ```
-There are a few things to note. ```.invert_branch()``` inverts the first occurance of its's argument var in the expression. If the second parameter ```include_var``` is passed as ```True```. Then the returned expression will be saved as "var=...".
+There are a few things to note. ```.invert_branch()``` inverts the first occurrence of its's argument var in the expression. If the second parameter ```include_var``` is passed as ```True```. Then the returned expression will be saved as "var=...".
 Boolean operations cannot be inverted.
 
 ## Derivatives
-This library has the ability to take [partial derivatives](https://en.wikipedia.org/wiki/Partial_derivative) of expressions.
+This library can take [partial derivatives](https://en.wikipedia.org/wiki/Partial_derivative) of expressions.
 
 It should be noted that this is only for differentiable expressions. This does not include boolean expressions. 
 
@@ -203,7 +204,7 @@ It should be noted that this is only for differentiable expressions. This does n
 
 |Parameter| Description|
 |-----|------|
-|var | the variable for which to differentiate with respect to|
+|var | the variable for which to differentiate to |
 
 ```python
 from axioms_2 import *
@@ -217,7 +218,7 @@ The form may look awkward but that's because ```.pD()``` takes advantage of [``c
 
 
 ## Taylor Expansion
-As an extenstion of the derivative functionality. For more information on [Taylor series](https://en.wikipedia.org/wiki/Taylor_series).
+As an extension of the derivative function. For more information on [Taylor series](https://en.wikipedia.org/wiki/Taylor_series).
 $$
 \ taylor(var,a,depth) = \sum_{n=0}^{depth} \frac{f^n(a)}{n!} (x-a)^n  \
 $$
@@ -225,11 +226,11 @@ $$
 ```expr.taylor_series(var,a,depth)```
 |Parameter| Description|
 |-----|------|
-|var | the variable for which to differentiate with respect to|
+|var | the variable for which to differentiate to |
 |a   | the point at which to evaluate the derivative and offset the polynomial|
 |depth | how many terms of the series to include|
 
-The code below shows how an expression is expanded into a taylor series.
+The code below shows how an expression is expanded into a Taylor series.
 
 ```python
 from axioms_2 import expr
@@ -241,12 +242,12 @@ print(poly.taylor_series('x','xo',2))
 ```
 
 ## Common Form
-Common form attempts to reduce expressions into more readable forms and perform a sort such that expressions that are equivalent via commutation and combination will be returned as exactly the same tree.
+Common form attempts to reduce expressions into more readable forms and perform a sort such that expressions that are equivalent via commutation and combination will be returned as the same tree.
 
 ```expr.common_form()```
 
 ```python
-from axioms_2 import expr,equals
+from axioms_2 import expr, equals
 
 poly1 = expr('a*x^2 + b*x + c')
 poly2 = expr('b*x + c + a*x^2')
