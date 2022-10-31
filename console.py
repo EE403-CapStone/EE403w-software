@@ -185,9 +185,22 @@ for a list of available commands, type 'help'
         funcs_menu = self.menuBar().addMenu('Functions')
         help_menu = self.menuBar().addMenu('Help')
 
-        new_act = QtGui.QAction(text='huh?')
+        new_act = QtGui.QAction('New', self)
         file_menu.addAction(new_act)
 
+        for (k,v) in command_line.Exp.funcs.items():
+            funcs_menu.addAction(QtGui.QAction(k, self))
+
+        for (k,v) in Command.commands.items():
+            action = QtGui.QAction(k, self)
+
+            # XXX WOOO CLOSURES!!!!
+            action.triggered.connect((lambda cmd: lambda: self.print(cmd.help()))(v))
+            #action.triggered.connect(tmp)
+
+            help_menu.addAction(action)
+
+        self.menuBar().addAction(new_act)
 
     @QtCore.Slot()
     def on_enter(self):
@@ -216,6 +229,10 @@ for a list of available commands, type 'help'
 
             self.environment_list.addItem(item)
 
+    #BUG: output isn't shown immediately, user has to press enter first
+    @QtCore.Slot(str)
+    def print(self, txt):
+        self.state.output_buffer.append(txt)   # record command in output
 
 """
 this is the user input loop. It collects and parses user input.
