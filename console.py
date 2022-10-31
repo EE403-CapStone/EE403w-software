@@ -132,7 +132,7 @@ class KeyEventHandler(QtCore.QObject):
             # standard event processing
             return QtCore.QObject.eventFilter(self, obj, event)
 
-class MainWindow(QtWidgets.QWidget):
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.state = State()
@@ -154,14 +154,18 @@ for a list of available commands, type 'help'
         self.environment_list = QtWidgets.QListWidget()
 
         # create main layout, QWindow (I think) is its parent
-        self.layout = QtWidgets.QVBoxLayout(self)
+        self.setCentralWidget(QtWidgets.QWidget()) # central widget needs a placeholder
 
+        self.layout = QtWidgets.QVBoxLayout(self.centralWidget()) # add layout to central widget
         self.hlayout = QtWidgets.QHBoxLayout()
         self.hlayout.addWidget(self.output_hist, stretch=10)
         self.hlayout.addWidget(self.environment_list)
 
         self.layout.addLayout(self.hlayout)
         self.layout.addWidget(self.cmd_input)
+
+        # add menu bar
+        self._add_menu_bar()
 
         # connect signals/slots
         self.cmd_input.returnPressed.connect(self.on_enter)
@@ -172,6 +176,18 @@ for a list of available commands, type 'help'
         # load icons
         self.expression_list_icon = QtGui.QIcon()
         self.expression_list_icon.addFile("icons/expression_list_item.png")
+
+    def _add_menu_bar(self):
+        self.menuBar().setNativeMenuBar(False)
+
+        file_menu = self.menuBar().addMenu('File')
+        graph_menu = self.menuBar().addMenu('Graph')
+        funcs_menu = self.menuBar().addMenu('Functions')
+        help_menu = self.menuBar().addMenu('Help')
+
+        new_act = QtGui.QAction(text='huh?')
+        file_menu.addAction(new_act)
+
 
     @QtCore.Slot()
     def on_enter(self):
