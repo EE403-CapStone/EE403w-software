@@ -59,7 +59,6 @@ class _set_expr(Command):
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
     def callback(argv:list) -> str:
-        print('argv0:', argv)
         # handle colon operator syntax
         if argv[0] == ':':
             arg = argv[1].split(':') # separate expression name from the expression (ie. EXP:a+b=c)
@@ -81,7 +80,6 @@ class _set_expr(Command):
             exp_str += e
 
         expression = Exp(exp_str)
-        print('argv1:', argv)
 
         Command.state.expressions[argv[1]] = expression
 

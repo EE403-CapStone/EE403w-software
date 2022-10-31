@@ -115,10 +115,6 @@ class KeyEventHandler(QtCore.QObject):
                 if index > 0:
                     self.state.command_history_index -= 1
                     self.cmd_input.setText(self.state.command_history[self.state.command_history_index])
-                print('after up arrow:')
-                print('hist len', len(self.state.command_history))
-                print('hist ind', self.state.command_history_index)
-                print()
 
             elif key_event.key() == DOWN_ARROW:
                 if index < len(history) and index != len(history) - 1:
@@ -128,10 +124,6 @@ class KeyEventHandler(QtCore.QObject):
                     self.state.command_history_index += 1
                     self.cmd_input.clear()
 
-                print('after down arrow:')
-                print('hist len', len(self.state.command_history))
-                print('hist ind', self.state.command_history_index)
-                print()
             else:
                 return QtCore.QObject.eventFilter(self, obj, event)
 
@@ -196,9 +188,6 @@ for a list of available commands, type 'help'
         self.state.output_buffer.clear()
         self.state.output_buffer.append('') # add a blank line for formatting
 
-        print('hist len', len(self.state.command_history))
-        print('hist ind', self.state.command_history_index)
-
         # update the list view
         self.environment_list.clear()
 
@@ -242,11 +231,9 @@ if __name__ == "__main__":
     for font in fonts:
         font_dir = QtCore.QDir.currentPath() + '/fonts/' + font
         id = QtGui.QFontDatabase.addApplicationFont(font_dir)
-        print(font+':', id)
 
     # load Minecraft font
     fonts = QtGui.QFontDatabase.applicationFontFamilies(0)
-    print(fonts)
     monofont = QtGui.QFont(fonts[0], 14)
     app.setFont(monofont)
 
