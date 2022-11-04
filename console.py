@@ -115,10 +115,6 @@ class KeyEventHandler(QtCore.QObject):
                 if index > 0:
                     self.state.command_history_index -= 1
                     self.cmd_input.setText(self.state.command_history[self.state.command_history_index])
-                print('after up arrow:')
-                print('hist len', len(self.state.command_history))
-                print('hist ind', self.state.command_history_index)
-                print()
 
             elif key_event.key() == DOWN_ARROW:
                 if index < len(history) and index != len(history) - 1:
@@ -128,10 +124,6 @@ class KeyEventHandler(QtCore.QObject):
                     self.state.command_history_index += 1
                     self.cmd_input.clear()
 
-                print('after down arrow:')
-                print('hist len', len(self.state.command_history))
-                print('hist ind', self.state.command_history_index)
-                print()
             else:
                 return QtCore.QObject.eventFilter(self, obj, event)
 
@@ -140,7 +132,7 @@ class KeyEventHandler(QtCore.QObject):
             # standard event processing
             return QtCore.QObject.eventFilter(self, obj, event)
 
-class MainWindow(QtWidgets.QWidget):
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.state = State()
@@ -162,14 +154,18 @@ for a list of available commands, type 'help'
         self.environment_list = QtWidgets.QListWidget()
 
         # create main layout, QWindow (I think) is its parent
-        self.layout = QtWidgets.QVBoxLayout(self)
+        self.setCentralWidget(QtWidgets.QWidget()) # central widget needs a placeholder
 
+        self.layout = QtWidgets.QVBoxLayout(self.centralWidget()) # add layout to central widget
         self.hlayout = QtWidgets.QHBoxLayout()
         self.hlayout.addWidget(self.output_hist, stretch=10)
         self.hlayout.addWidget(self.environment_list)
 
         self.layout.addLayout(self.hlayout)
         self.layout.addWidget(self.cmd_input)
+
+        # add menu bar
+        self._add_menu_bar()
 
         # connect signals/slots
         self.cmd_input.returnPressed.connect(self.on_enter)
@@ -180,6 +176,31 @@ for a list of available commands, type 'help'
         # load icons
         self.expression_list_icon = QtGui.QIcon()
         self.expression_list_icon.addFile("icons/expression_list_item.png")
+
+    def _add_menu_bar(self):
+        self.menuBar().setNativeMenuBar(False)
+
+        file_menu = self.menuBar().addMenu('File')
+        graph_menu = self.menuBar().addMenu('Graph')
+        funcs_menu = self.menuBar().addMenu('Functions')
+        help_menu = self.menuBar().addMenu('Help')
+
+        new_act = QtGui.QAction('New', self)
+        file_menu.addAction(new_act)
+
+        for (k,v) in command_line.Exp.funcs.items():
+            funcs_menu.addAction(QtGui.QAction(k, self))
+
+        for (k,v) in Command.commands.items():
+            action = QtGui.QAction(k, self)
+
+            # XXX WOOO CLOSURES!!!!
+            action.triggered.connect((lambda cmd: lambda: self.print(cmd.help()))(v))
+            #action.triggered.connect(tmp)
+
+            help_menu.addAction(action)
+
+        self.menuBar().addAction(new_act)
 
     @QtCore.Slot()
     def on_enter(self):
@@ -196,9 +217,6 @@ for a list of available commands, type 'help'
         self.state.output_buffer.clear()
         self.state.output_buffer.append('') # add a blank line for formatting
 
-        print('hist len', len(self.state.command_history))
-        print('hist ind', self.state.command_history_index)
-
         # update the list view
         self.environment_list.clear()
 
@@ -211,6 +229,10 @@ for a list of available commands, type 'help'
 
             self.environment_list.addItem(item)
 
+    #BUG: output isn't shown immediately, user has to press enter first
+    @QtCore.Slot(str)
+    def print(self, txt):
+        self.state.output_buffer.append(txt)   # record command in output
 
 """
 this is the user input loop. It collects and parses user input.
@@ -242,11 +264,9 @@ if __name__ == "__main__":
     for font in fonts:
         font_dir = QtCore.QDir.currentPath() + '/fonts/' + font
         id = QtGui.QFontDatabase.addApplicationFont(font_dir)
-        print(font+':', id)
 
     # load Minecraft font
     fonts = QtGui.QFontDatabase.applicationFontFamilies(0)
-    print(fonts)
     monofont = QtGui.QFont(fonts[0], 14)
     app.setFont(monofont)
 
