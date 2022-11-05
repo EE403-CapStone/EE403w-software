@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6.QtWidgets import *
 import command_line
 from command_line import Command
 """
@@ -13,6 +14,53 @@ def trim_command(cmd_string):
     n = cmd_string.find(' ')
     return cmd_string[n+1:]
 
+class IOAbstraction:
+    def __init__(self):
+        # TODO change from lists to dequeues (for efficiency)
+        self.input_buffer = []
+        self.output_buffer = []
+
+        self.flush_func = None
+
+    def print(self, txt: str):
+        self.input_buffer += [c for c in txt]
+
+    def println(self, txt: str):
+        self.input_buffer += [c for c in txt]
+        self.input_buffer.append('\n')
+
+    def flush():
+        if self.flush_func == None:
+            raise NotImplementedError
+
+        self.flush_func(self.output_buffer)
+        self.output_buffer.clear()
+
+    # gets the first character in the input buffer
+    def get(self) -> str:
+        # wait for something to be put into the input buffer
+        while len(self.input_buffer) == 0:
+            pass
+
+        # then return the first character that was entered
+        c = self.input_buffer[0]
+        self.input_buffer = self.input_buffer[1:]
+
+        return c
+
+    # grabs user input until they press enter
+    def getline(self) -> str:
+        txt = ''
+
+        while txt[-1] != '\n':
+            txt += self.get()
+
+        return txt
+
+    def set_flush(self, flush_func):
+        # TODO do some tests to make sure that flush_func is the correct type
+        self.flush_func = flush_func
+
 
 """
 The State class contains the current state of the application.
@@ -22,24 +70,56 @@ to commands which are then typed by the user.
 this design pattern allows the interface type to be easily interchangable (ie, output
 using curses to terminal, create a custom window with a graphcis library such as WebGPU
 or OpenGL and draw to a pixel buffer)
+
+The state class takes a pointer to a print function. whenever state.print(txt) is called,
+the state updates the internal output buffer, then calls the external print function. the
+external print function do whatever it needs to display the current state of the output buffer.
 """
 class State:
-    def __init__(self):
+    outputChanged = QtCore.Signal(str)
+
+    """
+    TODO describe io_system
+    """
+    def __init__(self, io_system):
         self.expressions = {}
         self.exit_prog = False
-        self.command_buffer = [] # commands which need to be processed
-        self.output_buffer = [] # lines which need to be printed to the screen
+
+        self.io = io_system
+        self.output_buffer = "" # string which needs to be printed to the screen
+        self.screen_mode = False # screen mode is used when a process want to take over the entire window.
+        self.screen_mode_buff = []
+
+        self.active_process = State.cmd_line
 
         self.command_history = [] # list of commands which were entered by the user.
         self.command_history_index = 0 # this is the current place in the command history
 
         Command.state = self
 
+    def cmd_line():
+        self.print("> ")
+        self.flush()
+        cmd = self.get_line()
+
+        self.process_cmd(cmd)
+
+    def get_line():
+        NotImplemented
+
+    def get_char():
+        NotImplemented
+
     def print(self, txt):
         self.output_buffer.append(str(txt))
 
-    def process_cmd(self):
-        cmd = self.command_buffer.pop()
+    """
+    this function is called to send the state display buffer to the graphics library.
+    """
+    def flush(self):
+        self.print_func(output_buffer)
+
+    def process_cmd(self, cmd: str):
         self.command_history.append(cmd)
         self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
 
@@ -60,6 +140,7 @@ class State:
 
         # TODO the implied set_expr is not implemented yet.
 
+        # BUG 'F::a+b=c' generates an error
         output = ''
         # check if this is the colon notation for set_expr
         # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
@@ -89,10 +170,13 @@ class State:
 
 
 class KeyEventHandler(QtCore.QObject):
-    def __init__(self, window):
+    def __init__(self, window, io_system):
         self.window = window
         self.state = window.state
-        self.cmd_input = window.cmd_input
+        self.output_hist = window.output_hist
+
+        self.io_system = io_system
+        self.io_system.set_flush(self.print_buff)
 
         super().__init__(window)
 
@@ -125,19 +209,25 @@ class KeyEventHandler(QtCore.QObject):
                     self.cmd_input.clear()
 
             else:
-                return QtCore.QObject.eventFilter(self, obj, event)
+                self.io_system.input_buffer.append(key_event.text())
 
             return True
         else:
             # standard event processing
             return QtCore.QObject.eventFilter(self, obj, event)
 
+    def print_buff(self, buff: list):
+        for t in buff:
+            self.output_hist.insertPlainText(t)
+
+    def get_io_system(self) -> IOAbstraction:
+        return self.io_system
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.state = State()
-
-        self.command_buffer = [] # list of commands which still need to be processed
+        io_system = IOAbstraction()
+        self.state = State(io_system)
 
         # history output. FIXME text is vertically aligned at top of frame
         # TODO add label widget next to line entry widget
@@ -170,8 +260,8 @@ for a list of available commands, type 'help'
         # connect signals/slots
         self.cmd_input.returnPressed.connect(self.on_enter)
 
-        ev = KeyEventHandler(self)
-        self.cmd_input.installEventFilter(ev)
+        ev = KeyEventHandler(self, io_system)
+        self.output_hist.installEventFilter(ev)
 
         # load icons
         self.expression_list_icon = QtGui.QIcon()
@@ -179,7 +269,7 @@ for a list of available commands, type 'help'
 
     def _add_menu_bar(self):
         self.menuBar().setNativeMenuBar(False)
-
+        # TODO add edit/application menu item to allow changing fonts etc.
         file_menu = self.menuBar().addMenu('File')
         graph_menu = self.menuBar().addMenu('Graph')
         funcs_menu = self.menuBar().addMenu('Functions')
@@ -196,7 +286,6 @@ for a list of available commands, type 'help'
 
             # XXX WOOO CLOSURES!!!!
             action.triggered.connect((lambda cmd: lambda: self.print(cmd.help()))(v))
-            #action.triggered.connect(tmp)
 
             help_menu.addAction(action)
 
@@ -204,18 +293,14 @@ for a list of available commands, type 'help'
 
     @QtCore.Slot()
     def on_enter(self):
-        self.state.command_buffer.append(self.cmd_input.text())  # put command in line to be processed
         self.state.output_buffer.append(self.cmd_input.text())   # record command in output
+
+        cmd = self.cmd_input.text()
+        self.state.process_cmd(cmd)
         self.cmd_input.clear()
-
-
-        self.state.process_cmd()
 
         for t in self.state.output_buffer:
             self.output_hist.append(t)
-
-        self.state.output_buffer.clear()
-        self.state.output_buffer.append('') # add a blank line for formatting
 
         # update the list view
         self.environment_list.clear()
