@@ -1,6 +1,5 @@
 from axioms_2 import expr as ExpBase
 from axioms_2 import node
-
 """
 Command Line
 
@@ -15,35 +14,100 @@ need to be registered to the Command class. This is done automatically upon
 instantiation of the subclass (when super().__init__(...) is called).
 """
 
-"""
-New commands must derive from this class.
+class Process:
+    """
+    All Commands/Processes must derive from this class.
+    if the process should be callable from the command line, then it needs to
+    be registered using the register function.
 
-there are two static fields:
-    - commands: a dictionary of all the commands currently registered
-    - state: a handle to the current state of the application
-"""
-class Command:
-    # all of the defined commands
-    commands = {}
+    command class names must follow this naming convention: '_somecmd'. the class
+    name is used to identify the command the user types
+
+    Whenever a process is called, it tracks the parent process, and sets the state foreground
+    process tracker to itself. Once the process is terminated, the foreground process must be restored.
+    there are two approaches to this:
+        - Non-interactive processes :: everything the process needs to do is done in the __init__() function.
+            at the end of the init function, set state.foreground_process to self.parent_process
+        - Interactive processes :: initial set-up done in __init__(), then internal state is updated with self.callback()
+            at some point within self.callback(), the process should relinquish control back to the parent process.
+
+    Required Static Fields in Subclasses:
+        - help_list: list (of tuples)
+        - cmdstr: str (or none)
+
+    Override Methods:
+        - callback(keyevent: str)
+
+
+    there are two static fields:
+        - commands: a dictionary of all the commands currently registered
+        - state: a handle to the current state of the application
+    """
+    # Set of all defined commands
+    command_dict = {}
 
     # handle to application state.
     # THIS MUST BE SET
     state = None
 
-    # TODO change help_str into a dictionary of sections and section text. example:
-    #  {'Description': 'Default Description', 'Usage': 'Default Usage'}
-    def __init__(self, cmd_str:str, help_str:str, callback=None):
-        self.cmd_str = cmd_str
-        self.help_str = help_str
-        self.callback = callback
-        Command.commands[cmd_str] = self
+    # help_list should be defined in each sub-class
+    help_list = [
+        ('Description', None),
+        ('Input', None),
+        ('Output', None),
+        ('Effects', None),
+        ('Usage', None)
+    ]
+
+    cmd_str = None
+
+    def __init__(self, argv: list):
+        self.state = Process.state
+        # track parent process
+        self.parent_process = self.state.fg_proc
+        # set self as foreground process
+        self.state.fg_proc = self
 
     def help(self) -> str:
-        return self.help_str
+        # this will grab the help_list defined statically in the subclass. If help_list isn't defined
+        # in the subclass, then the help list defined in Process is used.
+        help_list = type(self).__class__.help_list
 
-    def callback(argv: list) -> str:
+        help_txt = ''
+        for (title, content) in help_list:
+            if content == None:
+                continue
+
+            help_txt += title.upper() + '\n'
+            # TODO: automatically insert indents and newlines depending on the width of the terminal screen.
+            help_txt += content
+
+        # tell the user if nothing was defined for the command
+        if help_txt == '':
+            help_txt = 'No documentation has been defined for this command'
+
+        return help_txt
+
+    def callback(keyevent:str):
         return "default callback"
 
+    def register(self):
+        """
+        registers this process as a callable command.
+
+        if cmdstr is not defined in the class statically, the class name is used. it uses the class name (without
+        the leading underscore) as the name of the class this function requires an instance of the class to
+        register (though this instance is not referenced).
+
+        example command registration: '_somecmd().register()'
+        """
+        cmd_str = type(self).__name__[1:]
+
+        # use registered cmd_string if applicable
+        if self.__class__.cmd_str != None:
+            cmd_str = self.__class__.cmd_str
+
+            Process.command_dict[cmd_str] = type(self)
 
 class _set_expr(Command):
     def __init__(self):
@@ -178,6 +242,18 @@ class _eval(Command):
 
         output += '    ' + argv[1] + ' <- ' + str(exp)
         return(output)
+
+class _table(Command):
+    def __init__(self):
+        cmd_str = 'table'
+        desc = 'Creates a table of values which can be used for plotting, evaluating, etc.'
+        usage = 'table l w'
+        help_str = f'Description: {desc}\nUsage: {usage}'
+
+        super().__init__(cmd_str, help_str, _table.callback)
+
+    def callback(argv: list) -> str:
+        pass
 
 # register predefined commands.
 _set_expr()
