@@ -43,8 +43,8 @@ class Process:
         - commands: a dictionary of all the commands currently registered
         - state: a handle to the current state of the application
     """
-    # Set of all defined commands
-    command_dict = {}
+    # dict of all defined commands
+    commands = {}
 
     # handle to application state.
     # THIS MUST BE SET
@@ -67,6 +67,9 @@ class Process:
         self.parent_process = self.state.fg_proc
         # set self as foreground process
         self.state.fg_proc = self
+
+        # save argv for interactive processes
+        self.argv = argv
 
     def help(self) -> str:
         # this will grab the help_list defined statically in the subclass. If help_list isn't defined
@@ -107,22 +110,21 @@ class Process:
         if self.__class__.cmd_str != None:
             cmd_str = self.__class__.cmd_str
 
-            Process.command_dict[cmd_str] = type(self)
+            Process.commands[cmd_str] = type(self)
 
-class _set_expr(Command):
-    def __init__(self):
-        cmd_str = "setexpr"
-        help_str = "Description: binds an expression to an expression object\nUsage: setexpr EXP_NAME EXPRESSION"
-
-        super().__init__(cmd_str, help_str, _set_expr.callback)
-
-        # TODO add specific help instructions for this syntax
-        super().__init__(":", help_str, _set_expr.callback) # also initialize an instance for colon operator
+class _setexpr(Process):
+    """This command supports colon syntax. use 'setexpr' when indexing this process in Process.commands"""
+    help_list = [
+        ('Description', 'binds an expression to an expression object'),
+        ('Usage', 'setexpr EXP_NAME EXPRESSION')
+    ]
 
     # argv[0]: : or setexpr
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
-    def callback(argv:list) -> str:
+    def __init__(self, argv: list):
+        super().__init__(argv)
+
         # handle colon operator syntax
         if argv[0] == ':':
             arg = argv[1].split(':') # separate expression name from the expression (ie. EXP:a+b=c)
@@ -155,30 +157,32 @@ class _set_expr(Command):
         output += '    ' + argv[1] + ' <- ' +  str(Command.state.expressions[argv[1]])
         return(output)
 
-class _list_expr(Command):
-    def __init__(self):
-        cmd_str = "list"
-        help_str = "Description: displays currently defined expressions\nUsage: list"
+class _list(Process):
+    help_list = [
+        ('Description', 'displays currently defined expressions')
+        ('Usage', 'list')
+    ]
 
-        super().__init__(cmd_str, help_str, _list_expr.callback)
+    def __init__(self, argv: list):
+        super().__init__(argv)
 
-    def callback(argv:list) -> str:
         output = ''
         for k,e in Command.state.expressions.items():
             output += str(k) + ': ' + str(e) + '\n'
 
         return output
 
-class _help(Command):
-    def __init__(self):
-        cmd_str = "help"
-        help_str = "Description: displays help text for a given command\nUsage: help COMMAND\n       help all #to display all commands"
-
-        super().__init__(cmd_str, help_str, _help.callback)
+class _help(Process):
+    help_list = [
+        ('Description', 'displays help text for a given command')
+        ('Usage', 'help COMMAND\n       help all #to display all commands')
+    ]
 
     # argv[0]: help
     # argv[1]: COMMAND
-    def callback(argv:list) -> str:
+    def __init__(self, argv: list):
+        super().__init__(argv)
+
         output = ''
         if len(argv) == 1:
             output = Command.commands['help'].help()
@@ -199,7 +203,11 @@ class _help(Command):
 
         return output
 
-class _exit(Command):
+class _exit(Process):
+    help_list = [
+        ('Description', 'displays help text for a given command')
+        ('Usage', 'help COMMAND\n       help all #to display all commands')
+    ]
     def __init__(self):
         cmd_str = "exit"
         help_str = "Description: exits calculator program\nUsage: exit"
@@ -210,16 +218,17 @@ class _exit(Command):
     def callback(argv:list) -> str:
         Command.state.exit_prog = True
 
-class _eval(Command):
-    def __init__(self):
-        cmd_str = "eval"
-        help_str = "Description: Evaluates expression (functions, numerica values, etc.)\nUsage: eval EXPRESSION"
-
-        super().__init__(cmd_str, help_str, _eval.callback)
+class _eval(Process):
+    help_list = [
+        ('Description', 'Evaluates expression (functions, numerica values, etc.)')
+        ('Usage', 'eval EXPRESSION')
+    ]
 
     # argv[0]: eval
     # argv[1]: EXPRESSION
-    def callback(argv:list) -> str:
+    def __init__(self, argv: list):
+        super().__init__(argv)
+
         # TODO add the ability to parse an expression or expression reference
         if argv[1] not in Command.state.expressions:
             return '    ERROR: expression "' + argv[1] + '" is not defined.'
@@ -243,24 +252,22 @@ class _eval(Command):
         output += '    ' + argv[1] + ' <- ' + str(exp)
         return(output)
 
-class _table(Command):
-    def __init__(self):
-        cmd_str = 'table'
-        desc = 'Creates a table of values which can be used for plotting, evaluating, etc.'
-        usage = 'table l w'
-        help_str = f'Description: {desc}\nUsage: {usage}'
+class _table(Process):
+    help_lis = [
+        ('Description', 'Creates a table of values which can be used for plotting, evaluating, etc.')
+        ('Usage', 'table l w')
+    ]
 
-        super().__init__(cmd_str, help_str, _table.callback)
-
-    def callback(argv: list) -> str:
-        pass
+    def __init__(self, argv: list):
+        super().__init__(argv)
 
 # register predefined commands.
-_set_expr()
-_list_expr()
-_help()
-_exit()
-_eval()
+_set_expr().register()
+_list_expr().register()
+_help().register()
+_exit().register()
+_eval().register()
+_table().register()
 
 ################################################
 class ExpFunctionError(Exception):
