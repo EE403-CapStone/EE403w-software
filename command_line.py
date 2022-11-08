@@ -124,6 +124,7 @@ class _setexpr(Process):
     # argv[2]: expression value (ex. 'x+y=2')
     def __init__(self, argv: list):
         super().__init__(argv)
+        self.state.fg_proc = self.parent_process
 
         # handle colon operator syntax
         if argv[0] == ':':
@@ -159,12 +160,13 @@ class _setexpr(Process):
 
 class _list(Process):
     help_list = [
-        ('Description', 'displays currently defined expressions')
+        ('Description', 'displays currently defined expressions'),
         ('Usage', 'list')
     ]
 
     def __init__(self, argv: list):
         super().__init__(argv)
+        self.state.fg_proc = self.parent_process
 
         output = ''
         for k,e in Command.state.expressions.items():
@@ -174,7 +176,7 @@ class _list(Process):
 
 class _help(Process):
     help_list = [
-        ('Description', 'displays help text for a given command')
+        ('Description', 'displays help text for a given command'),
         ('Usage', 'help COMMAND\n       help all #to display all commands')
     ]
 
@@ -182,6 +184,7 @@ class _help(Process):
     # argv[1]: COMMAND
     def __init__(self, argv: list):
         super().__init__(argv)
+        self.state.fg_proc = self.parent_process
 
         output = ''
         if len(argv) == 1:
@@ -205,22 +208,20 @@ class _help(Process):
 
 class _exit(Process):
     help_list = [
-        ('Description', 'displays help text for a given command')
+        ('Description', 'displays help text for a given command'),
         ('Usage', 'help COMMAND\n       help all #to display all commands')
     ]
-    def __init__(self):
-        cmd_str = "exit"
-        help_str = "Description: exits calculator program\nUsage: exit"
-
-        super().__init__(cmd_str, help_str, _exit.callback)
 
     # argv[0]: exit
-    def callback(argv:list) -> str:
+    def __init__(self):
+        super().__init__(cmd_str, help_str, _exit.callback)
+        self.state.fg_proc = self.parent_process
+
         Command.state.exit_prog = True
 
 class _eval(Process):
     help_list = [
-        ('Description', 'Evaluates expression (functions, numerica values, etc.)')
+        ('Description', 'Evaluates expression (functions, numerica values, etc.)'),
         ('Usage', 'eval EXPRESSION')
     ]
 
@@ -228,6 +229,7 @@ class _eval(Process):
     # argv[1]: EXPRESSION
     def __init__(self, argv: list):
         super().__init__(argv)
+        self.state.fg_proc = self.parent_process
 
         # TODO add the ability to parse an expression or expression reference
         if argv[1] not in Command.state.expressions:
@@ -254,7 +256,7 @@ class _eval(Process):
 
 class _table(Process):
     help_lis = [
-        ('Description', 'Creates a table of values which can be used for plotting, evaluating, etc.')
+        ('Description', 'Creates a table of values which can be used for plotting, evaluating, etc.'),
         ('Usage', 'table l w')
     ]
 
