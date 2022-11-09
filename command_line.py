@@ -140,7 +140,8 @@ class _setexpr(Process):
                 argv.insert(2, arg[1]) # add the first part of the expression to the argument list
 
         if argv[0] == 'setexpr' and len(argv) <= 1:
-            return('Error: not supported!')
+            self.state.io.print('Error: not supported!')
+            return
 
         if argv[1] == '':
             argv[1] = 'ans'
@@ -159,7 +160,7 @@ class _setexpr(Process):
             output += '    ⍄ ' + str(eval_result) + '\n'
 
         output += '    ' + argv[1] + ' <- ' +  str(self.state.expressions[argv[1]])
-        return(output)
+        self.state.io.println(output)
 
 class _list(Process):
     help_list = [
@@ -175,7 +176,7 @@ class _list(Process):
         for k,e in self.state.expressions.items():
             output += str(k) + ': ' + str(e) + '\n'
 
-        return output
+        self.state.io.println(output)
 
 class _help(Process):
     help_list = [
@@ -207,7 +208,8 @@ class _help(Process):
         # add some indentation for more readability
         output = '    ' + output.replace('\n', '\n    ')
 
-        return output
+        self.state.io.println(output)
+        return
 
 class _exit(Process):
     help_list = [
@@ -236,7 +238,8 @@ class _eval(Process):
 
         # TODO add the ability to parse an expression or expression reference
         if argv[1] not in self.state.expressions:
-            return '    ERROR: expression "' + argv[1] + '" is not defined.'
+            self.state.println('    ERROR: expression "' + argv[1] + '" is not defined.')
+            return
 
         exp = self.state.expressions[argv[1]]
 
@@ -255,7 +258,7 @@ class _eval(Process):
 
 
         output += '    ' + argv[1] + ' <- ' + str(exp)
-        return(output)
+        self.state.io.println(output)
 
 class _table(Process):
     help_lis = [
