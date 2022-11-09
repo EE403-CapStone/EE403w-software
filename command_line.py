@@ -46,10 +46,6 @@ class Process:
     # dict of all defined commands
     commands = {}
 
-    # handle to application state.
-    # THIS MUST BE SET
-    state = None
-
     # help_list should be defined in each sub-class
     help_list = [
         ('Description', None),
@@ -61,10 +57,15 @@ class Process:
 
     cmd_str = None
 
-    def __init__(self, argv: list):
-        self.state = Process.state
+    def __init__(self, argv: list, state):
+        self.state = state
+
         # track parent process
-        self.parent_process = self.state.fg_proc
+        try:
+            self.parent_process = self.state.fg_proc
+        except AttributeError:
+            self.parent_process = None
+
         # set self as foreground process
         self.state.fg_proc = self
 
@@ -91,10 +92,10 @@ class Process:
 
         return help_txt
 
-    def callback(keyevent:str):
+    def callback(self, keyevent:str):
         return "default callback"
 
-    def register(self):
+    def register(proc):
         """
         registers this process as a callable command.
 
@@ -102,15 +103,15 @@ class Process:
         the leading underscore) as the name of the class this function requires an instance of the class to
         register (though this instance is not referenced).
 
-        example command registration: '_somecmd().register()'
+        example command registration: 'Process.register(_somecmd)'
         """
-        cmd_str = type(self).__name__[1:]
+        cmd_str = proc.__name__[1:]
 
         # use registered cmd_string if applicable
-        if self.__class__.cmd_str != None:
-            cmd_str = self.__class__.cmd_str
+        if proc.cmd_str != None:
+            cmd_str = proc.cmd_str
 
-            Process.commands[cmd_str] = type(self)
+            Process.commands[cmd_str] = proc
 
 class _setexpr(Process):
     """This command supports colon syntax. use 'setexpr' when indexing this process in Process.commands"""
@@ -122,8 +123,8 @@ class _setexpr(Process):
     # argv[0]: : or setexpr
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
-    def __init__(self, argv: list):
-        super().__init__(argv)
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
         self.state.fg_proc = self.parent_process
 
         # handle colon operator syntax
@@ -164,8 +165,8 @@ class _list(Process):
         ('Usage', 'list')
     ]
 
-    def __init__(self, argv: list):
-        super().__init__(argv)
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
         self.state.fg_proc = self.parent_process
 
         output = ''
@@ -182,8 +183,8 @@ class _help(Process):
 
     # argv[0]: help
     # argv[1]: COMMAND
-    def __init__(self, argv: list):
-        super().__init__(argv)
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
         self.state.fg_proc = self.parent_process
 
         output = ''
@@ -213,8 +214,8 @@ class _exit(Process):
     ]
 
     # argv[0]: exit
-    def __init__(self):
-        super().__init__(cmd_str, help_str, _exit.callback)
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
         self.state.fg_proc = self.parent_process
 
         Command.state.exit_prog = True
@@ -227,8 +228,8 @@ class _eval(Process):
 
     # argv[0]: eval
     # argv[1]: EXPRESSION
-    def __init__(self, argv: list):
-        super().__init__(argv)
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
         self.state.fg_proc = self.parent_process
 
         # TODO add the ability to parse an expression or expression reference
@@ -260,16 +261,16 @@ class _table(Process):
         ('Usage', 'table l w')
     ]
 
-    def __init__(self, argv: list):
-        super().__init__(argv)
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
 
 # register predefined commands.
-_set_expr().register()
-_list_expr().register()
-_help().register()
-_exit().register()
-_eval().register()
-_table().register()
+Process.register(_setexpr)
+Process.register(_list)
+Process.register(_help)
+Process.register(_exit)
+Process.register(_eval)
+Process.register(_table)
 
 ################################################
 class ExpFunctionError(Exception):
