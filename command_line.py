@@ -111,7 +111,9 @@ class Process:
         if proc.cmd_str != None:
             cmd_str = proc.cmd_str
 
-            Process.commands[cmd_str] = proc
+        print(f'cmd_str: {cmd_str}')
+
+        Process.commands[cmd_str] = proc
 
 class _setexpr(Process):
     """This command supports colon syntax. use 'setexpr' when indexing this process in Process.commands"""
@@ -149,14 +151,14 @@ class _setexpr(Process):
 
         expression = Exp(exp_str)
 
-        Command.state.expressions[argv[1]] = expression
+        self.state.expressions[argv[1]] = expression
 
         output = ''
         eval_result = expression.evaluate()
         if eval_result != None:
             output += '    ⍄ ' + str(eval_result) + '\n'
 
-        output += '    ' + argv[1] + ' <- ' +  str(Command.state.expressions[argv[1]])
+        output += '    ' + argv[1] + ' <- ' +  str(self.state.expressions[argv[1]])
         return(output)
 
 class _list(Process):
@@ -170,7 +172,7 @@ class _list(Process):
         self.state.fg_proc = self.parent_process
 
         output = ''
-        for k,e in Command.state.expressions.items():
+        for k,e in self.state.expressions.items():
             output += str(k) + ': ' + str(e) + '\n'
 
         return output
@@ -189,16 +191,16 @@ class _help(Process):
 
         output = ''
         if len(argv) == 1:
-            output = Command.commands['help'].help()
+            output = self.commands['help'].help()
         elif argv[1] == 'all':
-            for cmd in Command.commands:
+            for cmd in self.commands:
                 output += cmd+'\n'
 
             output += '\nuse "help COMMAND" to get details on a specific command'
         else:
-            if argv[1] in Command.commands:
+            if argv[1] in self.commands:
                 output += 'help page for "' + argv[1] + '"\n'
-                output += Command.commands[argv[1]].help()
+                output += self.commands[argv[1]].help()
             else:
                 output += 'the command "' + argv[1] + '" is not a valid command'
 
@@ -218,7 +220,7 @@ class _exit(Process):
         super().__init__(argv, state)
         self.state.fg_proc = self.parent_process
 
-        Command.state.exit_prog = True
+        self.state.exit_prog = True
 
 class _eval(Process):
     help_list = [
@@ -233,12 +235,12 @@ class _eval(Process):
         self.state.fg_proc = self.parent_process
 
         # TODO add the ability to parse an expression or expression reference
-        if argv[1] not in Command.state.expressions:
+        if argv[1] not in self.state.expressions:
             return '    ERROR: expression "' + argv[1] + '" is not defined.'
 
-        exp = Command.state.expressions[argv[1]]
+        exp = self.state.expressions[argv[1]]
 
-        exp.evaluate_funcs(env=Command.state.expressions)
+        exp.evaluate_funcs(self.state.expressions)
 
         # XXX probably don't need to fix the variables twice.
         # fix the variables
@@ -271,6 +273,8 @@ Process.register(_help)
 Process.register(_exit)
 Process.register(_eval)
 Process.register(_table)
+
+print(Process.commands)
 
 ################################################
 class ExpFunctionError(Exception):
