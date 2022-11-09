@@ -3,7 +3,7 @@ import sys
 from PySide6 import QtCore, QtWidgets, QtGui
 from PySide6.QtWidgets import *
 import command_line
-from command_line import Command
+from command_line import Process
 """
 returns the arguments of cmd_string
 """
@@ -23,59 +23,118 @@ class IOAbstraction:
         self.flush_func = None
 
     def print(self, txt: str):
-        self.input_buffer += [c for c in txt]
+        self.output_buffer += [c for c in txt]
 
     def println(self, txt: str):
-        self.input_buffer += [c for c in txt]
-        self.input_buffer.append('\n')
+        self.output_buffer += [c for c in txt]
+        self.output_buffer.append('\n')
 
-    def flush():
+    def flush(self):
         if self.flush_func == None:
             raise NotImplementedError
 
         self.flush_func(self.output_buffer)
         self.output_buffer.clear()
 
-    # gets the first character in the input buffer
-    def get(self) -> str:
-        # wait for something to be put into the input buffer
-        while len(self.input_buffer) == 0:
-            pass
-
-        # then return the first character that was entered
-        c = self.input_buffer[0]
-        self.input_buffer = self.input_buffer[1:]
-
-        return c
-
-    # grabs user input until they press enter
-    def getline(self) -> str:
-        txt = ''
-
-        while txt[-1] != '\n':
-            txt += self.get()
-
-        return txt
-
     def set_flush(self, flush_func):
         # TODO do some tests to make sure that flush_func is the correct type
         self.flush_func = flush_func
 
 
-"""
-The State class contains the current state of the application.
-it provides methods which can be used to modify the state, or be bound
-to commands which are then typed by the user.
+class cmd_line(Process):
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
 
-this design pattern allows the interface type to be easily interchangable (ie, output
-using curses to terminal, create a custom window with a graphcis library such as WebGPU
-or OpenGL and draw to a pixel buffer)
+        self.current_line = ''
+        self.return_from_call = True
 
-The state class takes a pointer to a print function. whenever state.print(txt) is called,
-the state updates the internal output buffer, then calls the external print function. the
-external print function do whatever it needs to display the current state of the output buffer.
-"""
+    def callback(self, keyevent: str):
+        # print prompt if necessary
+        if self.return_from_call:
+            self.state.io.print("> ")
+            self.state.io.flush()
+            self.return_from_call = False
+
+        if keyevent == '\r':
+            self._run_cmd()
+
+            self.return_from_call = True
+            self.current_line = ''
+        else:
+            self.current_line += keyevent
+
+        self.state.io.print(keyevent)
+        self.state.io.flush()
+
+    def _run_cmd(self):
+        cmd = self.current_line
+
+        # case where use just pressed enter
+        if cmd == '':
+            return
+
+        # determine if output should be supressed
+        suppress_output = False
+        if cmd[-1] == ';':
+            suppress_output = True
+            cmd = cmd[:-1]
+
+        argv = cmd.split(' ')
+
+        # remove blank tokens from superfluous whitespace
+        while argv.count('') != 0:
+            argv.remove('')
+
+        # TODO the implied set_expr is not implemented yet.
+        # TODO implement supressed output
+
+        # BUG 'F::a+b=c' generates an error
+
+        # check if this is the colon notation for set_expr
+        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
+        if argv[0] in Process.commands:
+            # command isn't using ':' notation
+            Process.commands[argv[0]](argv, self.state)
+
+        # these cases may be ':' notation of setexpr
+        elif argv[0].count(':') == 1:
+            argv.insert(0, ':')
+            Process.commands['setexpr'](argv, self.state)
+        elif argv[1].count(':') == 1:
+            arg = argv[1].split(':')
+            if len(arg) > 2:
+                self.state.io.println('Error: malformed command')
+            elif arg[0] != '':
+                self.state.io.println('Error: malformed command')
+            else:
+                argv.insert(0, ':')
+                argv[2] = arg[1]
+                Process.commands['setexpr'](argv, self.state)
+        else:
+            self.state.io.println('"' + argv[0] + '" is not a recognized command or script.')
+
+
+    def __str__(self):
+        return 'cmd_line {\n' +\
+        f'    current_line: {self.current_line}\n' +\
+        f'    self.return_from_call: {self.return_from_call}\n' +\
+        '}'
+
+
 class State:
+    """
+    The State class contains the current state of the application.
+    it provides methods which can be used to modify the state, or be bound
+    to commands which are then typed by the user.
+
+    this design pattern allows the interface type to be easily interchangable (ie, output
+    using curses to terminal, create a custom window with a graphcis library such as WebGPU
+    or OpenGL and draw to a pixel buffer)
+
+    The state class takes a pointer to a print function. whenever state.print(txt) is called,
+    the state updates the internal output buffer, then calls the external print function. the
+    external print function do whatever it needs to display the current state of the output buffer.
+    """
     outputChanged = QtCore.Signal(str)
 
     """
@@ -86,45 +145,28 @@ class State:
         self.exit_prog = False
 
         self.io = io_system
-        self.output_buffer = "" # string which needs to be printed to the screen
         self.screen_mode = False # screen mode is used when a process want to take over the entire window.
         self.screen_mode_buff = []
 
-        self.active_process = State.cmd_line
+        # HACK this probably shouldn't be done like this.
+        Process.state = self
+
+        # process which will be called
+        self.fg_proc = cmd_line([], self)
 
         self.command_history = [] # list of commands which were entered by the user.
         self.command_history_index = 0 # this is the current place in the command history
 
-        Command.state = self
-
-    def cmd_line():
-        self.print("> ")
-        self.flush()
-        cmd = self.get_line()
-
-        self.process_cmd(cmd)
-
-    def get_line():
-        NotImplemented
-
-    def get_char():
-        NotImplemented
-
-    def print(self, txt):
-        self.output_buffer.append(str(txt))
-
-    """
-    this function is called to send the state display buffer to the graphics library.
-    """
-    def flush(self):
-        self.print_func(output_buffer)
+    def push_cmd(self, cmd:str):
+        self.command_history.append(cmd)
+        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
 
     def process_cmd(self, cmd: str):
         self.command_history.append(cmd)
         self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
 
         if cmd is None or cmd == '':
-            return
+            return (cmd_line, [])
 
         # determine if output should be supressed
         suppress_output = False
@@ -144,11 +186,11 @@ class State:
         output = ''
         # check if this is the colon notation for set_expr
         # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-        if argv[0] in Command.commands:
-            output = Command.commands[argv[0]].callback(argv)
+        if argv[0] in Process.commands:
+            return (Process.commands[argv[0]], argv)
         elif argv[0].count(':') == 1:
             argv.insert(0, ':')
-            output = Command.commands[argv[0]].callback(argv)
+            return (Process.commands[argv[0]], argv)
         elif argv[1].count(':') == 1:
             arg = argv[1].split(':')
             if len(arg) > 2:
@@ -158,15 +200,17 @@ class State:
             else:
                 argv.insert(0, ':')
                 argv[2] = arg[1]
-                output = Command.commands[argv[0]].callback(argv)
+                return (Process.commands[argv[0]], argv)
         else:
             output = ('"' + argv[0] + '" is not a recognized command or script.')
 
         # don't print if there was a semicolon at the end of the input
         if suppress_output:
-            return
+            return (cmd_line, [])
         else:
-            self.print(output)
+            self.io.println('')
+            self.io.println(output)
+            return (cmd_line, [])
 
 
 class KeyEventHandler(QtCore.QObject):
@@ -209,7 +253,7 @@ class KeyEventHandler(QtCore.QObject):
                     self.cmd_input.clear()
 
             else:
-                self.io_system.input_buffer.append(key_event.text())
+                self.state.fg_proc.callback(key_event.text())
 
             return True
         else:
@@ -258,7 +302,6 @@ for a list of available commands, type 'help'
         self._add_menu_bar()
 
         # connect signals/slots
-        self.cmd_input.returnPressed.connect(self.on_enter)
 
         ev = KeyEventHandler(self, io_system)
         self.output_hist.installEventFilter(ev)
@@ -281,7 +324,7 @@ for a list of available commands, type 'help'
         for (k,v) in command_line.Exp.funcs.items():
             funcs_menu.addAction(QtGui.QAction(k, self))
 
-        for (k,v) in Command.commands.items():
+        for (k,v) in Process.commands.items():
             action = QtGui.QAction(k, self)
 
             # XXX WOOO CLOSURES!!!!
@@ -291,6 +334,8 @@ for a list of available commands, type 'help'
 
         self.menuBar().addAction(new_act)
 
+
+    """
     @QtCore.Slot()
     def on_enter(self):
         self.state.output_buffer.append(self.cmd_input.text())   # record command in output
@@ -315,9 +360,7 @@ for a list of available commands, type 'help'
             self.environment_list.addItem(item)
 
     #BUG: output isn't shown immediately, user has to press enter first
-    @QtCore.Slot(str)
-    def print(self, txt):
-        self.state.output_buffer.append(txt)   # record command in output
+    """
 
 """
 this is the user input loop. It collects and parses user input.
