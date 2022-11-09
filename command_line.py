@@ -111,8 +111,6 @@ class Process:
         if proc.cmd_str != None:
             cmd_str = proc.cmd_str
 
-        print(f'cmd_str: {cmd_str}')
-
         Process.commands[cmd_str] = proc
 
 class _setexpr(Process):
@@ -276,8 +274,6 @@ Process.register(_help)
 Process.register(_exit)
 Process.register(_eval)
 Process.register(_table)
-
-print(Process.commands)
 
 ################################################
 class ExpFunctionError(Exception):

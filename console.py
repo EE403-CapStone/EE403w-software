@@ -56,6 +56,7 @@ class cmd_line(Process):
             self.return_from_call = False
 
         if keyevent == '\r':
+            self.state.io.println('')
             self._run_cmd()
 
             self.return_from_call = True
