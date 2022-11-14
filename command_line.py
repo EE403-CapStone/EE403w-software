@@ -222,6 +222,28 @@ class _exit(Process):
 
         self.state.exit_prog = True
 
+class _echo(Process):
+    help_list = [
+        ('Description', 'print the arguments onto the screen.'),
+        ('Usage', 'echo hello world')
+    ]
+
+    def __init__(self, argv: list, state):
+        super().__init__(argv, state)
+        state.fg_proc = self.parent_process
+
+        output = ''
+        try:
+            for i in argv[1:]:
+                output += i + ' '
+        except:
+            pass
+
+        state.io.println(output)
+        return
+
+
+
 class _eval(Process):
     help_list = [
         ('Description', 'Evaluates expression (functions, numerica values, etc.)'),
@@ -272,6 +294,7 @@ Process.register(_setexpr)
 Process.register(_list)
 Process.register(_help)
 Process.register(_exit)
+Process.register(_echo)
 Process.register(_eval)
 Process.register(_table)
 
