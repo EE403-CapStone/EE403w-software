@@ -43,6 +43,11 @@ class IOAbstraction:
 
 class cmd_line(Process):
     def __init__(self, argv: list, state):
+        """
+        argv[0]: cmd_line
+        argv[1]: 's' for silent or 'v' for verbose
+        argv[2]: initial command
+        """
         super().__init__(argv, state)
 
         self.current_line = ''
@@ -57,7 +62,11 @@ class cmd_line(Process):
 
         if keyevent == '\r':
             self.state.io.println('')
-            self._run_cmd()
+            try:
+                self._run_cmd()
+            except Exception as e:
+                self.state.io.println('ERROR: there was a problem with processing that command')
+                self.state.io.println(str(e))
 
             self.return_from_call = True
             self.current_line = ''
@@ -274,15 +283,12 @@ class MainWindow(QtWidgets.QMainWindow):
         io_system = IOAbstraction()
         self.state = State(io_system)
 
-        # history output. FIXME text is vertically aligned at top of frame
-        # TODO add label widget next to line entry widget
         self.output_hist = QtWidgets.QTextEdit('')
-        self.output_hist.setText(
-"""CALCULATOR RUNTIME ENVIRONMENT
-Written by Ethan Smith and Erik Huuki
-for a list of available commands, type 'help'
-"""
-        )
+
+        """CALCULATOR RUNTIME ENVIRONMENT
+        Written by Ethan Smith and Erik Huuki
+        for a list of available commands, type 'help'
+        """
         self.output_hist.setReadOnly(True)
 
         self.cmd_input = QtWidgets.QLineEdit()
@@ -310,6 +316,8 @@ for a list of available commands, type 'help'
         # load icons
         self.expression_list_icon = QtGui.QIcon()
         self.expression_list_icon.addFile("icons/expression_list_item.png")
+
+        self.state.fg_proc.callback('')
 
     def _add_menu_bar(self):
         self.menuBar().setNativeMenuBar(False)
