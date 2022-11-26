@@ -2,7 +2,7 @@ from axioms_2 import expr as ExpBase
 from axioms_2 import node
 from queue import Queue
 import threading
-from textwrap import dedent
+from textwrap import dedent, indent
 
 class LengthError(Exception):
     '''
@@ -181,16 +181,13 @@ class Process:
         defined in the  subclass, the the default one in  Process is used (where
         everything is none.)
         '''
-        help_list = type(self).__class__.help_list
-
         help_txt = ''
-        for (title, content) in help_list:
+        for (title, content) in self.help_list:
             if content == None:
                 continue
 
             help_txt += title.upper() + '\n'
-            # TODO: automatically insert indents and newlines depending on the width of the terminal screen.
-            help_txt += content
+            help_txt += indent(dedent(content), '    ') + '\n'
 
         # tell the user if nothing was defined for the command
         if help_txt == '':
@@ -217,6 +214,19 @@ class Process:
 
         Process.commands[cmd_str] = proc
 
+
+    def putln(self, s: str):
+        '''helper function to reduce typing'''
+        self.state.putln(s)
+    def put(self, s: str):
+        '''helper function to reduce typing'''
+        self.state.put(s)
+    def get(self):
+        '''helper function to reduce typing'''
+        return self.state.get()
+    def getline(self):
+        '''helper function to reduce typing'''
+        return self.state.getline()
 
 class cmd_line(Process):
     '''
@@ -249,8 +259,8 @@ class cmd_line(Process):
                 self.state.putln()
                 self._run_cmd(line)
             except Exception as e:
-                self.state.putln('ERROR: there was a problem with processing that command')
-                self.state.putln(str(e))
+                self.state.putln('ERROR: there was a problem processing that command')
+                self.state.putln(str(e) + ', ' + str(type(e)))
 
     def _run_cmd(self, cmd: str):
         '''helper function which reduces special syntax'''
@@ -273,19 +283,18 @@ class cmd_line(Process):
         # TODO the implied set_expr is not implemented yet.
         # TODO implement supressed output
 
-        # BUG 'F::a+b=c' generates an error
-
-        # check if this is the colon notation for set_expr
-        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
+        # see if the command is registered
         if argv[0] in Process.commands:
             # command isn't using ':' notation
-            Process.commands[argv[0]](argv, self.state)
+            Process.commands[argv[0]](argv, self.state).run()
 
-        # these cases may be ':' notation of setexpr
+        # BUG 'F::a+b=c' generates an error
+        # the command may have colon notation
+        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
         elif argv[0].count(':') == 1:
             argv.insert(0, ':')
-            Process.commands['setexpr'](argv, self.state)
-        elif argv[1].count(':') == 1:
+            Process.commands['setexpr'](argv, self.state).run()
+        elif len(argv) > 1 and argv[1].count(':') == 1:
             arg = argv[1].split(':')
             if len(arg) > 2:
                 self.state.putln('Error: malformed command')
@@ -294,7 +303,7 @@ class cmd_line(Process):
             else:
                 argv.insert(0, ':')
                 argv[2] = arg[1]
-                Process.commands['setexpr'](argv, self.state)
+                Process.commands['setexpr'](argv, self.state).run()
         else:
             self.state.putln('"' + argv[0] + '" is not a recognized command or script.')
 
@@ -320,6 +329,7 @@ class _setexpr(Process):
     # argv[2]: expression value (ex. 'x+y=2')
     def run(self):
         self.state.fg_proc = self.parent_process
+        argv = self.argv
 
         # handle colon operator syntax
         if argv[0] == ':':
@@ -376,46 +386,39 @@ class _help(Process):
     '''provides access to the robust help features of this application.'''
     help_list = [
         ('Description', 'displays help text for a given command'),
-        ('Usage', 'help COMMAND\n       help all #to display all commands')
+        ('Usage', \
+        '''\
+        help COMMAND   # to see help on a specific command
+        help all       # to see all available commands
+        ''')
     ]
 
     # argv[0]: help
     # argv[1]: COMMAND
-    def startup(self):
+    def run(self):
+        argv = self.argv
         self.state.fg_proc = self.parent_process
 
         output = ''
         if len(argv) == 1:
-            output = self.commands['help'].help()
+            self.putln(self.commands['help']([], self.state).help())
         elif argv[1] == 'all':
             for cmd in self.commands:
-                output += cmd+'\n'
+                self.state.putln(cmd)
 
-            output += '\nuse "help COMMAND" to get details on a specific command'
+            self.state.putln('\nuse "help COMMAND" to get details on a specific command')
         else:
             if argv[1] in self.commands:
-                output += 'help page for "' + argv[1] + '"\n'
-                output += self.commands[argv[1]].help()
+                self.putln(self.commands[argv[1]]([], self.state).help())
             else:
-                output += 'the command "' + argv[1] + '" is not a valid command'
+                self.putln(f'the command "{argv[1]}" is not a valid command')
 
-        # add some indentation for more readability
-        output = '    ' + output.replace('\n', '\n    ')
-
-        #self.state.io.println(output)
-        self.state.put(output)
-        print(output)
         return
 
 class _exit(Process):
     '''supposedly exits the application.'''
-    help_list = [
-        ('Description', 'displays help text for a given command'),
-        ('Usage', 'help COMMAND\n       help all #to display all commands')
-    ]
-
     # argv[0]: exit
-    def startup(self):
+    def run(self):
         self.state.fg_proc = self.parent_process
 
         self.state.exit_prog = True
@@ -427,7 +430,8 @@ class _echo(Process):
         ('Usage', 'echo hello world')
     ]
 
-    def startup(self):
+    def run(self):
+        argv = self.argv
         state.fg_proc = self.parent_process
 
         output = ''
@@ -449,7 +453,8 @@ class _eval(Process):
 
     # argv[0]: eval
     # argv[1]: EXPRESSION
-    def startup(self):
+    def run(self):
+        argv = self.argv
         self.state.fg_proc = self.parent_process
 
         # TODO add the ability to parse an expression or expression reference
@@ -480,7 +485,7 @@ class _table(Process):
         ('Usage', 'table l w')
     ]
 
-    def startup(self, argv: list, state):
+    def run(self, argv: list, state):
         pass
 
 Process.register(_list)
