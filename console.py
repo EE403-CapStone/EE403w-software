@@ -10,7 +10,18 @@ from queue import Queue, Empty
 import threading
 
 class Interpreter(QObject):
+    '''
+    Wrapper/Interface  between   calculator  runtime  application  and   the  Qt
+    environment.  Emits a  signal whenever  there is  output which  needs to  be
+    displayed to the  screen. a slot in  the terminal is then  connected to this
+    signal prints text from the ostream to its internal buffer.
+
+    It derives  from QObject  so that  it can  be integrated  into the  Qt Event
+    system
+    '''
+
     class State(command_line.State):
+        '''wrapper class to extend functionality of put method'''
         def __init__(self, interp):
             super().__init__()
             self.interp = interp
@@ -28,13 +39,20 @@ class Interpreter(QObject):
         self.t.start()
 
     def _run(self):
+        '''target for thread object'''
         self.state.fg_proc.run()
 
     def flush(self):
+        '''tells anything looking for text in ostream to check the queue.'''
         self.recv_txt.emit()
 
 
 class KeyEventHandler(QtCore.QObject):
+    '''
+    DEPRECATION WARNING
+    this code  is pretty much  entirely deprecated. it  is only here  because it
+    contains functionality which needs to be ported over to the Terminal class
+    '''
     def __init__(self, window):
         self.window = window
         self.state = window.interpreter.state
@@ -94,10 +112,14 @@ class KeyEventHandler(QtCore.QObject):
 
         self.output_hist.setText(output)
 
-# TODO finish implementing this.
-# TODO the terminal needs a way to send its data out,
-# TODO and to recieve data in.
+
 class Terminal(QtWidgets.QScrollArea):
+    '''
+    "Dumb" terminal. It does dumb terminal things, like send/recieve characters,
+    and print the characters it revieves to the screen.
+
+    soon it will support even more dumb terminal things, like a cursor.
+    '''
     def __init__(self, parent, istream: Queue, ostream: Queue):
         super().__init__(parent)
         self.setWidgetResizable(True)
@@ -173,8 +195,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         #self.output_hist.setReadOnly(True)
 
-        # TODO user can move cursor around
-        # TODO auto scroll to bottom
         self.cmd_input = QtWidgets.QLineEdit()
         self.environment_list = QtWidgets.QListWidget()
 
@@ -226,34 +246,6 @@ class MainWindow(QtWidgets.QMainWindow):
             help_menu.addAction(action)
 
         self.menuBar().addAction(new_act)
-
-
-    """
-    @QtCore.Slot()
-    def on_enter(self):
-        self.state.output_buffer.append(self.cmd_input.text())   # record command in output
-
-        cmd = self.cmd_input.text()
-        self.state.process_cmd(cmd)
-        self.cmd_input.clear()
-
-        for t in self.state.output_buffer:
-            self.output_hist.append(t)
-
-        # update the list view
-        self.environment_list.clear()
-
-        for e in self.state.expressions:
-            label = e + ': ' + str(self.state.expressions[e])
-
-            item = QtWidgets.QListWidgetItem()
-            item.setIcon(self.expression_list_icon)
-            item.setText(label)
-
-            self.environment_list.addItem(item)
-
-    #BUG: output isn't shown immediately, user has to press enter first
-    """
 
 """
 this is the user input loop. It collects and parses user input.

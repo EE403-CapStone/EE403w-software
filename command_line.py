@@ -5,60 +5,33 @@ import threading
 from textwrap import dedent
 
 class LengthError(Exception):
-    '''Raised when there the text in the input/output queues are not exactly 1 character long'''
+    '''
+    Raised when there the text in the input/output queues are not exactly 1
+    character long
+    '''
     def __str__(self):
         return 'LengthError: the terminal sent a string with a size other than 1'
 
-class Interpreter:
-    def __init__(self):
-        self.state = State()
-
-        self.t = threading.Thread(target=self._run)
-        self.t.start()
-
-    def _run(self):
-        self.state.fg_proc.run()
-        print('please dont print me')
-
-"""
-Command Line
-
-this file defines the commands which are able to be run on the command line.
-new commands are created by creating a new class which inherits Command.
-this new class must override the callback function. See commands like _set_expr
-for an example.
-
-it is crucial to create at least one instance of the class in this file.
-whenever this module is imported into the console.py file, all the subclasses
-need to be registered to the Command class. This is done automatically upon
-instantiation of the subclass (when super().__init__(...) is called).
-"""
 class State:
-    """
-    The State class contains the current state of the application.
-    it provides methods which can be used to modify the state, or be bound
-    to commands which are then typed by the user.
+    '''
+    provides  attributes and  methods  which  define the  current  state of  the
+    runtime environment.  input/output, expressions,  command history,  and many
+    other things are stored in this class.
 
-    this design pattern allows the interface type to be easily interchangable (ie, output
-    using curses to terminal, create a custom window with a graphcis library such as WebGPU
-    or OpenGL and draw to a pixel buffer)
-
-    The state class takes a pointer to a print function. whenever state.print(txt) is called,
-    the state updates the internal output buffer, then calls the external print function. the
-    external print function do whatever it needs to display the current state of the output buffer.
-    """
-
-    """
-    TODO describe io_system
-    """
+    In order  to start  the application,  an instant of  State must  be created,
+    then, fg_proc().run() must  be called. This starts the  first process, which
+    is by  default, the  command line. All  Processes send/recieve  their inputs
+    through  the  istream/ostream  queues.  This  class  is  thread  safe.  When
+    interfacing to a  front end, the user  may encapsulate State in  a new class
+    and  override  its put  method  to  signal an  update  to  the display  (for
+    example).
+    '''
     def __init__(self):
         self.expressions = {}
         self.exit_prog = False
 
         self.istream = Queue()
         self.ostream = Queue()
-        self.screen_mode = False # screen mode is used when a process want to take over the entire window.
-        self.screen_mode_buff = []
 
         # process which will be called
         self.fg_proc = cmd_line([], self)
@@ -71,20 +44,46 @@ class State:
         self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
 
     def put(self, s: str):
+        '''
+        sends a string down the output pipe.
+
+        front-end implementations may want to  override this method to send some
+        kind of  signal to update  their display buffer. otherwise,  the ostream
+        needs to be polled.
+        '''
+        # NOTE: this can probably be optimized. it doesn't really need to send
+        # strings one character at a time.
         for c in s:
             self.ostream.put(c)
 
+    def putln(self, s: str = None):
+        '''like put, but adds a newline to the end.'''
+        if s != None:
+            for c in s:
+                self.ostream.put(c)
+
+        self.ostream.put('\n')
+
     def get(self):
+        '''
+        reads  a character  from the  input  \'stream\'. Blocks  until there  is
+        something in the queue.
+        '''
         c = self.istream.get()
 
         if len(c) != 1:
             raise LengthError
 
-        self.put(c)
-
         return c
 
     def getline(self):
+        '''
+        reads a line from the input  \'stream\'. Blocks until there is something
+        in the queue.
+
+        this functions performs  the line editing operations that  you would see
+        from a tty driver (ie backspace, echoing the character, etc.)
+        '''
         line = ''
         while True:
             # get and validate a character
@@ -106,37 +105,42 @@ class State:
 
 class Process:
     """
-    All Commands/Processes must derive from this class.
-    if the process should be callable from the command line, then it needs to
-    be registered using the register function.
+    All Commands/Processes must derive from this class. If the process should be
+    callable from  the command line,  then it needs  to be registered  using the
+    register function.
 
-    command class names must follow this naming convention: '_somecmd'. the class
-    name is used to identify the command the user types
+    command  class names  must follow  this naming  convention: '_somecmd'.  the
+    class  name is  used to  identify the  command the  user types.  Alternative
+    spellings for commands  may be defined by setting cmd_str  to something oher
+    than none.  Help text is generated  for each command through  the statically
+    assigned help_list attribute.  every subclass should redefine  this to suite
+    its needs.
 
-    Whenever a process is called, it tracks the parent process, and sets the state foreground
-    process tracker to itself. Once the process is terminated, the foreground process must be restored.
-    there are two approaches to this:
-        - Non-interactive processes :: everything the process needs to do is done in the __init__() function.
-            at the end of the init function, set state.foreground_process to self.parent_process
-        - Interactive processes :: initial set-up done in __init__(), then internal state is updated with self.callback()
-            at some point within self.callback(), the process should relinquish control back to the parent process.
+    DEPRECATION  WARNING
+    Whenever a  process is called,  it tracks the  parent process, and  sets the
+    state foreground process tracker to  itself. Once the process is terminated,
+    the foreground process  must be restored. This process may  be deprecated in
+    the future.  Originally, the  callback function every  time a  character was
+    typed, so  this was needed to  track which callback to  call. Now, Processes
+    use  blocking input  functions,  so  it no  longer  necessary  to track  the
+    callback like this.
 
     Required Static Fields in Subclasses:
-        - help_list: list (of tuples)
-        - cmdstr: str (or none)
+        - help_list: list
+        - cmd_str: str (or none)
 
     Override Methods:
-        - callback(keyevent: str)
+        - run()
 
-
-    there are two static fields:
+    Static Fields:
         - commands: a dictionary of all the commands currently registered
-        - state: a handle to the current state of the application
+        - help_list: list of tuples of the form (title:str, body:str). Provided
+          here for reference.
     """
     # dict of all defined commands
     commands = {}
 
-    # help_list should be defined in each sub-class
+    # help_list should be re-defined in each sub-class
     help_list = [
         ('Description', None),
         ('Input', None),
@@ -148,11 +152,11 @@ class Process:
     cmd_str = None
 
     def __init__(self, argv: list, state):
-        """
+        '''
         argv: list of arguments which are provided to the application
         state: reference to the state
         stdout: output stream
-        """
+        '''
         self.state = state
 
         # track parent process
@@ -167,12 +171,16 @@ class Process:
         # save argv for interactive processes
         self.argv = argv
 
-    def run(self, keyevent:str):
+    def run(self):
         return "default callback"
 
     def help(self) -> str:
-        # this will grab the help_list defined statically in the subclass. If help_list isn't defined
-        # in the subclass, then the help list defined in Process is used.
+        '''
+        Uses the  statically defined help_list  (redefined in each  subclass) to
+        generate  and format  help  text  for the  command.  If help_list  isn't
+        defined in the  subclass, the the default one in  Process is used (where
+        everything is none.)
+        '''
         help_list = type(self).__class__.help_list
 
         help_txt = ''
@@ -191,15 +199,16 @@ class Process:
         return help_txt
 
     def register(proc):
-        """
+        '''
         registers this process as a callable command.
 
-        if cmdstr is not defined in the class statically, the class name is used. it uses the class name (without
-        the leading underscore) as the name of the class this function requires an instance of the class to
+        if cmdstr  is not  defined in  the class statically,  the class  name is
+        used. it  uses the class  name (without  the leading underscore)  as the
+        name of  the class this  function requires an  instance of the  class to
         register (though this instance is not referenced).
 
         example command registration: 'Process.register(_somecmd)'
-        """
+        '''
         cmd_str = proc.__name__[1:]
 
         # use registered cmd_string if applicable
@@ -210,6 +219,11 @@ class Process:
 
 
 class cmd_line(Process):
+    '''
+    This process is akin to bash, zsh, or any other shell in a unix system. It's
+    job is  to collect  input, run  programs, and present  their outputs  to the
+    user.
+    '''
     def run(self):
         intro_text = """
         CALCULATOR RUNTIME ENVIRONMENT
@@ -232,13 +246,14 @@ class cmd_line(Process):
                 continue
 
             try:
-                self.state.put('\n')
+                self.state.putln()
                 self._run_cmd(line)
             except Exception as e:
-                self.state.put('ERROR: there was a problem with processing that command\n')
-                self.state.put(str(e) + '\n')
+                self.state.putln('ERROR: there was a problem with processing that command')
+                self.state.putln(str(e))
 
     def _run_cmd(self, cmd: str):
+        '''helper function which reduces special syntax'''
         # case where use just pressed enter
         if cmd == '':
             return
@@ -273,15 +288,15 @@ class cmd_line(Process):
         elif argv[1].count(':') == 1:
             arg = argv[1].split(':')
             if len(arg) > 2:
-                self.state.put('Error: malformed command')
+                self.state.putln('Error: malformed command')
             elif arg[0] != '':
-                self.state.put('Error: malformed command')
+                self.state.putln('Error: malformed command')
             else:
                 argv.insert(0, ':')
                 argv[2] = arg[1]
                 Process.commands['setexpr'](argv, self.state)
         else:
-            self.state.put('"' + argv[0] + '" is not a recognized command or script.')
+            self.state.putln('"' + argv[0] + '" is not a recognized command or script.')
 
     def __str__(self):
         return 'cmd_line {\n' +\
@@ -291,7 +306,10 @@ class cmd_line(Process):
 
 
 class _setexpr(Process):
-    """This command supports colon syntax. use 'setexpr' when indexing this process in Process.commands"""
+    """
+    This command supports colon syntax. use 'setexpr' when indexing this process
+    in Process.commands
+    """
     help_list = [
         ('Description', 'binds an expression to an expression object'),
         ('Usage', 'setexpr EXP_NAME EXPRESSION')
@@ -338,6 +356,7 @@ class _setexpr(Process):
         self.state.put(output)
 
 class _list(Process):
+    '''lists all the expressions which are currently defined.'''
     help_list = [
         ('Description', 'displays currently defined expressions'),
         ('Usage', 'list')
@@ -354,6 +373,7 @@ class _list(Process):
 
 
 class _help(Process):
+    '''provides access to the robust help features of this application.'''
     help_list = [
         ('Description', 'displays help text for a given command'),
         ('Usage', 'help COMMAND\n       help all #to display all commands')
@@ -388,6 +408,7 @@ class _help(Process):
         return
 
 class _exit(Process):
+    '''supposedly exits the application.'''
     help_list = [
         ('Description', 'displays help text for a given command'),
         ('Usage', 'help COMMAND\n       help all #to display all commands')
@@ -400,6 +421,7 @@ class _exit(Process):
         self.state.exit_prog = True
 
 class _echo(Process):
+    '''prints its arguments to the screen'''
     help_list = [
         ('Description', 'print the arguments onto the screen.'),
         ('Usage', 'echo hello world')
@@ -419,6 +441,7 @@ class _echo(Process):
         return
 
 class _eval(Process):
+    '''evaluates the given expression'''
     help_list = [
         ('Description', 'Evaluates expression (functions, numerica values, etc.)'),
         ('Usage', 'eval EXPRESSION')
