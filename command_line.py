@@ -287,25 +287,31 @@ class cmd_line(Process):
         if argv[0] in Process.commands:
             # command isn't using ':' notation
             Process.commands[argv[0]](argv, self.state).run()
+            return
 
-        # BUG 'F::a+b=c' generates an error
-        # the command may have colon notation
-        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-        elif argv[0].count(':') == 1:
-            argv.insert(0, ':')
-            Process.commands['setexpr'](argv, self.state).run()
-        elif len(argv) > 1 and argv[1].count(':') == 1:
-            arg = argv[1].split(':')
-            if len(arg) > 2:
-                self.state.putln('Error: malformed command')
-            elif arg[0] != '':
-                self.state.putln('Error: malformed command')
-            else:
-                argv.insert(0, ':')
-                argv[2] = arg[1]
-                Process.commands['setexpr'](argv, self.state).run()
-        else:
-            self.state.putln('"' + argv[0] + '" is not a recognized command or script.')
+        # Command could be in colon notation
+        # Proper colon notation:
+        #  F: a+b=c
+        #  F :a+b=c
+        #  F : a+b=c
+        #  F:a+b=c
+        # Improper colon notation (error):
+        #  F:
+        #  F:: a+b=c
+        #  F :: a+b=c
+        #  F ::a+b=c
+        #  F::a+b=c
+        #
+        # essentially, as long as there is only one colon in the command, then
+        # the format is valid.
+        colon_fmt = cmd.split(':')
+        if len(colon_fmt) == 2:
+            argv = ['setexpr', colon_fmt[0], colon_fmt[1]]
+            Process.commands[argv[0]](argv, self.state).run()
+            return
+
+        self.putln(f'command not found: "{argv[0]}"')
+        return
 
     def __str__(self):
         return 'cmd_line {\n' +\
@@ -331,20 +337,23 @@ class _setexpr(Process):
         self.state.fg_proc = self.parent_process
         argv = self.argv
 
-        # handle colon operator syntax
-        if argv[0] == ':':
-            arg = argv[1].split(':') # separate expression name from the expression (ie. EXP:a+b=c)
-
-            if len(arg) == 1:
-                pass
-            else:
-                argv[1] = arg[0] # add the name of the expression to argument list
-                argv.insert(2, arg[1]) # add the first part of the expression to the argument list
-
-        if argv[0] == 'setexpr' and len(argv) <= 1:
-            print('Error: not supported', file=self.stdout)
-            #self.state.io.print('Error: not supported!')
+        # argv must be at least three to be functional (if its just one, print
+        # the help text)
+        # ['setexpr', 'name', 'expression', ...]
+        if len(argv) == 1:
+            self.putln(self.help())
+        elif len(argv) < 3:
+            self.putln('argument error: expected at least 2, got 1')
             return
+
+        # remove any leading/trailing whitespace
+        argv[1] = argv[1].strip()
+
+        forbidden_chars = '+=*&^%$#@!~`\|(){}[];:\'"/?.>,<`'
+        for c in argv[1]:
+            if c in forbidden_chars:
+                self.putln(f'invalid character errror: "{c}"')
+                return
 
         if argv[1] == '':
             argv[1] = 'ans'
@@ -353,17 +362,19 @@ class _setexpr(Process):
         for e in argv[2:]:
             exp_str += e
 
-        expression = Exp(exp_str)
+        try:
+            expression = Exp(exp_str)
+        except Exception as e:
+            self.putln(f'expression format error: {e}')
+            return
 
         self.state.expressions[argv[1]] = expression
 
-        output = ''
         eval_result = expression.evaluate()
         if eval_result != None:
-            output += '    ⍄ ' + str(eval_result) + '\n'
+            self.putln(f'    ⍄ {str(eval_result)}')
 
-        output += '    ' + argv[1] + ' <- ' +  str(self.state.expressions[argv[1]])
-        self.state.put(output)
+        self.putln(f'    {argv[1]} <- {str(self.state.expressions[argv[1]])}')
 
 class _list(Process):
     '''lists all the expressions which are currently defined.'''
@@ -488,6 +499,7 @@ class _table(Process):
     def run(self, argv: list, state):
         pass
 
+Process.register(_setexpr)
 Process.register(_list)
 Process.register(_help)
 Process.register(_exit)
