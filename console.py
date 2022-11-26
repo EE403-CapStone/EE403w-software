@@ -131,7 +131,6 @@ class Terminal(QtWidgets.QScrollArea):
         self.text.setContentsMargins(0,0,0,0)
         self.text.setFrameStyle(QtWidgets.QFrame.Box)
         self.text.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-        self.text.setText('hello there\ngeneral kenobi')
         self.text.setAlignment(QtCore.Qt.AlignTop)
 
         super().setWidget(self.text)
@@ -167,6 +166,7 @@ class Terminal(QtWidgets.QScrollArea):
         self.text.setText(txt)
 
     def recv_text(self):
+        # get text from the output stream
         txt = self.text.text()
         while True:
             try:
@@ -183,6 +183,12 @@ class Terminal(QtWidgets.QScrollArea):
                 break
 
         self.text.setText(txt)
+        self.repaint()
+
+        # scroll output view to bottom if necessary
+        # BUG the scroll view isn't getting updated for some reason.
+        scrollbar = self.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
