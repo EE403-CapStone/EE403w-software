@@ -1,5 +1,4 @@
 import os
-from xdrlib import ConversionError
 import openai
 import dotenv
 
@@ -9,27 +8,25 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class convo:
   def __init__(self):
-    self.conversation = ""
+    self.context = ['']*6
 
     
   def query(self,question):
-    start_sequence = "\nAI:"
-    restart_sequence = "\nHuman: "
-
-    self.conversation += restart_sequence+question+'\n'
-
+    question = ''.join(self.context)+question
     response = openai.Completion.create(
       model="text-davinci-002",
-      prompt=self.conversation,
-      temperature=0.9,
-      max_tokens=250,
+      prompt=question,
+      temperature=0.7,
+      max_tokens=256,
       top_p=1,
       frequency_penalty=0,
-      presence_penalty=0.6,
-      stop=["AI:","Human:"]
-    )
-    self.conversation += response.choices[0].text
-    return response.choices[0].text
+      presence_penalty=0)
+    return "Mathilda:"+response.choices[0].text
+  
+  def add_context(self,mathilda, user):
+    self.context[:4] = self.context[2:]
+    self.context[4] = user
+    self.context[5] = mathilda
   
   
 def test_prompt():
@@ -42,5 +39,4 @@ def test_prompt():
   frequency_penalty=0,
   presence_penalty=0)
   return response.choices[0].text
-
 
