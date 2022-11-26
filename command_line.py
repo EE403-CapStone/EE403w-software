@@ -1,5 +1,25 @@
 from axioms_2 import expr as ExpBase
 from axioms_2 import node
+from queue import Queue
+import threading
+from textwrap import dedent
+
+class LengthError(Exception):
+    '''Raised when there the text in the input/output queues are not exactly 1 character long'''
+    def __str__(self):
+        return 'LengthError: the terminal sent a string with a size other than 1'
+
+class Interpreter:
+    def __init__(self):
+        self.state = State()
+
+        self.t = threading.Thread(target=self._run)
+        self.t.start()
+
+    def _run(self):
+        self.state.fg_proc.run()
+        print('please dont print me')
+
 """
 Command Line
 
@@ -13,6 +33,76 @@ whenever this module is imported into the console.py file, all the subclasses
 need to be registered to the Command class. This is done automatically upon
 instantiation of the subclass (when super().__init__(...) is called).
 """
+class State:
+    """
+    The State class contains the current state of the application.
+    it provides methods which can be used to modify the state, or be bound
+    to commands which are then typed by the user.
+
+    this design pattern allows the interface type to be easily interchangable (ie, output
+    using curses to terminal, create a custom window with a graphcis library such as WebGPU
+    or OpenGL and draw to a pixel buffer)
+
+    The state class takes a pointer to a print function. whenever state.print(txt) is called,
+    the state updates the internal output buffer, then calls the external print function. the
+    external print function do whatever it needs to display the current state of the output buffer.
+    """
+
+    """
+    TODO describe io_system
+    """
+    def __init__(self):
+        self.expressions = {}
+        self.exit_prog = False
+
+        self.istream = Queue()
+        self.ostream = Queue()
+        self.screen_mode = False # screen mode is used when a process want to take over the entire window.
+        self.screen_mode_buff = []
+
+        # process which will be called
+        self.fg_proc = cmd_line([], self)
+
+        self.command_history = [] # list of commands which were entered by the user.
+        self.command_history_index = 0 # this is the current place in the command history
+
+    def push_cmd(self, cmd:str):
+        self.command_history.append(cmd)
+        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
+
+    def put(self, s: str):
+        for c in s:
+            self.ostream.put(c)
+
+    def get(self):
+        c = self.istream.get()
+
+        if len(c) != 1:
+            raise LengthError
+
+        self.put(c)
+
+        return c
+
+    def getline(self):
+        line = ''
+        while True:
+            # get and validate a character
+            c = self.istream.get()
+            if len(c) != 1:
+                raise LengthError
+
+            if c in '\n\r':
+                break
+            elif c == '\x7f':
+                if len(line) > 0:
+                    line = line[:-1]
+                    self.put(c)
+            else:
+                self.put(c)
+                line += c
+
+        return line
 
 class Process:
     """
@@ -58,6 +148,11 @@ class Process:
     cmd_str = None
 
     def __init__(self, argv: list, state):
+        """
+        argv: list of arguments which are provided to the application
+        state: reference to the state
+        stdout: output stream
+        """
         self.state = state
 
         # track parent process
@@ -71,6 +166,9 @@ class Process:
 
         # save argv for interactive processes
         self.argv = argv
+
+    def run(self, keyevent:str):
+        return "default callback"
 
     def help(self) -> str:
         # this will grab the help_list defined statically in the subclass. If help_list isn't defined
@@ -92,9 +190,6 @@ class Process:
 
         return help_txt
 
-    def callback(self, keyevent:str):
-        return "default callback"
-
     def register(proc):
         """
         registers this process as a callable command.
@@ -113,6 +208,88 @@ class Process:
 
         Process.commands[cmd_str] = proc
 
+
+class cmd_line(Process):
+    def run(self):
+        intro_text = """
+        CALCULATOR RUNTIME ENVIRONMENT
+        Written by Ethan Smith and Erik Huuki
+        for a list of available commands, type 'help'
+        """
+
+        self.state.put(dedent(intro_text))
+        self.state.put('\n')
+
+        while True:
+            # print prompt
+            self.state.put('> ')
+
+            # get user input
+            try:
+                line = self.state.getline()
+            except Exception as e:
+                self.state.put(f'Input Error: {str(e)}')
+                continue
+
+            try:
+                self.state.put('\n')
+                self._run_cmd(line)
+            except Exception as e:
+                self.state.put('ERROR: there was a problem with processing that command\n')
+                self.state.put(str(e) + '\n')
+
+    def _run_cmd(self, cmd: str):
+        # case where use just pressed enter
+        if cmd == '':
+            return
+
+        # determine if output should be supressed
+        suppress_output = False
+        if cmd[-1] == ';':
+            suppress_output = True
+            cmd = cmd[:-1]
+
+        argv = cmd.split(' ')
+
+        # remove blank tokens from superfluous whitespace
+        while argv.count('') != 0:
+            argv.remove('')
+
+        # TODO the implied set_expr is not implemented yet.
+        # TODO implement supressed output
+
+        # BUG 'F::a+b=c' generates an error
+
+        # check if this is the colon notation for set_expr
+        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
+        if argv[0] in Process.commands:
+            # command isn't using ':' notation
+            Process.commands[argv[0]](argv, self.state)
+
+        # these cases may be ':' notation of setexpr
+        elif argv[0].count(':') == 1:
+            argv.insert(0, ':')
+            Process.commands['setexpr'](argv, self.state)
+        elif argv[1].count(':') == 1:
+            arg = argv[1].split(':')
+            if len(arg) > 2:
+                self.state.put('Error: malformed command')
+            elif arg[0] != '':
+                self.state.put('Error: malformed command')
+            else:
+                argv.insert(0, ':')
+                argv[2] = arg[1]
+                Process.commands['setexpr'](argv, self.state)
+        else:
+            self.state.put('"' + argv[0] + '" is not a recognized command or script.')
+
+    def __str__(self):
+        return 'cmd_line {\n' +\
+        f'    current_line: {self.current_line}\n' +\
+        f'    self.return_from_call: {self.return_from_call}\n' +\
+        '}'
+
+
 class _setexpr(Process):
     """This command supports colon syntax. use 'setexpr' when indexing this process in Process.commands"""
     help_list = [
@@ -123,8 +300,7 @@ class _setexpr(Process):
     # argv[0]: : or setexpr
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def run(self):
         self.state.fg_proc = self.parent_process
 
         # handle colon operator syntax
@@ -138,7 +314,8 @@ class _setexpr(Process):
                 argv.insert(2, arg[1]) # add the first part of the expression to the argument list
 
         if argv[0] == 'setexpr' and len(argv) <= 1:
-            self.state.io.print('Error: not supported!')
+            print('Error: not supported', file=self.stdout)
+            #self.state.io.print('Error: not supported!')
             return
 
         if argv[1] == '':
@@ -158,7 +335,7 @@ class _setexpr(Process):
             output += '    ⍄ ' + str(eval_result) + '\n'
 
         output += '    ' + argv[1] + ' <- ' +  str(self.state.expressions[argv[1]])
-        self.state.io.println(output)
+        self.state.put(output)
 
 class _list(Process):
     help_list = [
@@ -166,15 +343,15 @@ class _list(Process):
         ('Usage', 'list')
     ]
 
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def run(self):
         self.state.fg_proc = self.parent_process
 
         output = ''
         for k,e in self.state.expressions.items():
             output += str(k) + ': ' + str(e) + '\n'
 
-        self.state.io.println(output)
+        self.state.put(output)
+
 
 class _help(Process):
     help_list = [
@@ -184,8 +361,7 @@ class _help(Process):
 
     # argv[0]: help
     # argv[1]: COMMAND
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def startup(self):
         self.state.fg_proc = self.parent_process
 
         output = ''
@@ -206,7 +382,9 @@ class _help(Process):
         # add some indentation for more readability
         output = '    ' + output.replace('\n', '\n    ')
 
-        self.state.io.println(output)
+        #self.state.io.println(output)
+        self.state.put(output)
+        print(output)
         return
 
 class _exit(Process):
@@ -216,8 +394,7 @@ class _exit(Process):
     ]
 
     # argv[0]: exit
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def startup(self):
         self.state.fg_proc = self.parent_process
 
         self.state.exit_prog = True
@@ -228,8 +405,7 @@ class _echo(Process):
         ('Usage', 'echo hello world')
     ]
 
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def startup(self):
         state.fg_proc = self.parent_process
 
         output = ''
@@ -239,10 +415,8 @@ class _echo(Process):
         except:
             pass
 
-        state.io.println(output)
+        self.state.put(output)
         return
-
-
 
 class _eval(Process):
     help_list = [
@@ -252,8 +426,7 @@ class _eval(Process):
 
     # argv[0]: eval
     # argv[1]: EXPRESSION
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def startup(self):
         self.state.fg_proc = self.parent_process
 
         # TODO add the ability to parse an expression or expression reference
@@ -270,15 +443,13 @@ class _eval(Process):
         exp.dir.clear()
         exp.map()
 
-
         output = ''
         eval_result = exp.evaluate()
         if eval_result != None:
             output += '    ⍄ ' + str(eval_result) + '\n'
 
-
         output += '    ' + argv[1] + ' <- ' + str(exp)
-        self.state.io.println(output)
+        self.state.put(output)
 
 class _table(Process):
     help_lis = [
@@ -286,11 +457,9 @@ class _table(Process):
         ('Usage', 'table l w')
     ]
 
-    def __init__(self, argv: list, state):
-        super().__init__(argv, state)
+    def startup(self, argv: list, state):
+        pass
 
-# register predefined commands.
-Process.register(_setexpr)
 Process.register(_list)
 Process.register(_help)
 Process.register(_exit)

@@ -1,239 +1,50 @@
 #!/usr/bin/env python3
 import sys
 from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6.QtCore import QObject, Qt
 from PySide6.QtWidgets import *
 import command_line
 from command_line import Process
-"""
-returns the arguments of cmd_string
-"""
-def trim_command(cmd_string):
-    if not ' ' in cmd_string:
-        return '' # there is only one token in this string
+import io
+from queue import Queue, Empty
+import threading
 
-    n = cmd_string.find(' ')
-    return cmd_string[n+1:]
+class Interpreter(QObject):
+    class State(command_line.State):
+        def __init__(self, interp):
+            super().__init__()
+            self.interp = interp
+        def put(self, s: str):
+            super().put(s)
+            self.interp.recv_txt.emit()
 
-class IOAbstraction:
+    recv_txt = QtCore.Signal()
     def __init__(self):
-        # TODO change from lists to dequeues (for efficiency)
-        self.input_buffer = []
-        self.output_buffer = []
+        super().__init__()
 
-        self.flush_func = None
+        self.state = Interpreter.State(self)
 
-    def print(self, txt: str):
-        self.output_buffer += [c for c in txt]
+        self.t = threading.Thread(target=self._run)
+        self.t.start()
 
-    def println(self, txt: str):
-        self.output_buffer += [c for c in txt]
-        self.output_buffer.append('\n')
+    def _run(self):
+        self.state.fg_proc.run()
 
     def flush(self):
-        if self.flush_func == None:
-            raise NotImplementedError
-
-        self.flush_func(self.output_buffer)
-        self.output_buffer.clear()
-
-    def set_flush(self, flush_func):
-        # TODO do some tests to make sure that flush_func is the correct type
-        self.flush_func = flush_func
-
-
-class cmd_line(Process):
-    def __init__(self, argv: list, state):
-        """
-        argv[0]: cmd_line
-        argv[1]: 's' for silent or 'v' for verbose
-        argv[2]: initial command
-        """
-        super().__init__(argv, state)
-
-        self.current_line = ''
-        self.return_from_call = True
-
-    def callback(self, keyevent: str):
-        # print prompt if necessary
-        if self.return_from_call:
-            self.state.io.print("> ")
-            self.state.io.flush()
-            self.return_from_call = False
-
-        if keyevent == '\r':
-            self.state.io.println('')
-            try:
-                self._run_cmd()
-            except Exception as e:
-                self.state.io.println('ERROR: there was a problem with processing that command')
-                self.state.io.println(str(e))
-
-            self.return_from_call = True
-            self.current_line = ''
-        else:
-            self.current_line += keyevent
-
-        self.state.io.print(keyevent)
-        self.state.io.flush()
-
-    def _run_cmd(self):
-        cmd = self.current_line
-
-        # case where use just pressed enter
-        if cmd == '':
-            return
-
-        # determine if output should be supressed
-        suppress_output = False
-        if cmd[-1] == ';':
-            suppress_output = True
-            cmd = cmd[:-1]
-
-        argv = cmd.split(' ')
-
-        # remove blank tokens from superfluous whitespace
-        while argv.count('') != 0:
-            argv.remove('')
-
-        # TODO the implied set_expr is not implemented yet.
-        # TODO implement supressed output
-
-        # BUG 'F::a+b=c' generates an error
-
-        # check if this is the colon notation for set_expr
-        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-        if argv[0] in Process.commands:
-            # command isn't using ':' notation
-            Process.commands[argv[0]](argv, self.state)
-
-        # these cases may be ':' notation of setexpr
-        elif argv[0].count(':') == 1:
-            argv.insert(0, ':')
-            Process.commands['setexpr'](argv, self.state)
-        elif argv[1].count(':') == 1:
-            arg = argv[1].split(':')
-            if len(arg) > 2:
-                self.state.io.println('Error: malformed command')
-            elif arg[0] != '':
-                self.state.io.println('Error: malformed command')
-            else:
-                argv.insert(0, ':')
-                argv[2] = arg[1]
-                Process.commands['setexpr'](argv, self.state)
-        else:
-            self.state.io.println('"' + argv[0] + '" is not a recognized command or script.')
-
-
-    def __str__(self):
-        return 'cmd_line {\n' +\
-        f'    current_line: {self.current_line}\n' +\
-        f'    self.return_from_call: {self.return_from_call}\n' +\
-        '}'
-
-
-class State:
-    """
-    The State class contains the current state of the application.
-    it provides methods which can be used to modify the state, or be bound
-    to commands which are then typed by the user.
-
-    this design pattern allows the interface type to be easily interchangable (ie, output
-    using curses to terminal, create a custom window with a graphcis library such as WebGPU
-    or OpenGL and draw to a pixel buffer)
-
-    The state class takes a pointer to a print function. whenever state.print(txt) is called,
-    the state updates the internal output buffer, then calls the external print function. the
-    external print function do whatever it needs to display the current state of the output buffer.
-    """
-    outputChanged = QtCore.Signal(str)
-
-    """
-    TODO describe io_system
-    """
-    def __init__(self, io_system):
-        self.expressions = {}
-        self.exit_prog = False
-
-        self.io = io_system
-        self.screen_mode = False # screen mode is used when a process want to take over the entire window.
-        self.screen_mode_buff = []
-
-        # HACK this probably shouldn't be done like this.
-        Process.state = self
-
-        # process which will be called
-        self.fg_proc = cmd_line([], self)
-
-        self.command_history = [] # list of commands which were entered by the user.
-        self.command_history_index = 0 # this is the current place in the command history
-
-    def push_cmd(self, cmd:str):
-        self.command_history.append(cmd)
-        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
-
-    def process_cmd(self, cmd: str):
-        self.command_history.append(cmd)
-        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
-
-        if cmd is None or cmd == '':
-            return (cmd_line, [])
-
-        # determine if output should be supressed
-        suppress_output = False
-        if cmd[-1] == ';':
-            suppress_output = True
-            cmd = cmd[:-1]
-
-        argv = cmd.split(' ')
-
-        # remove blank tokens from superfluous whitespace
-        while argv.count('') != 0:
-            argv.remove('')
-
-        # TODO the implied set_expr is not implemented yet.
-
-        # BUG 'F::a+b=c' generates an error
-        output = ''
-        # check if this is the colon notation for set_expr
-        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-        if argv[0] in Process.commands:
-            return (Process.commands[argv[0]], argv)
-        elif argv[0].count(':') == 1:
-            argv.insert(0, ':')
-            return (Process.commands[argv[0]], argv)
-        elif argv[1].count(':') == 1:
-            arg = argv[1].split(':')
-            if len(arg) > 2:
-                output = 'Error: malformed command'
-            elif arg[0] != '':
-                output = 'Error: malformed command'
-            else:
-                argv.insert(0, ':')
-                argv[2] = arg[1]
-                return (Process.commands[argv[0]], argv)
-        else:
-            output = ('"' + argv[0] + '" is not a recognized command or script.')
-
-        # don't print if there was a semicolon at the end of the input
-        if suppress_output:
-            return (cmd_line, [])
-        else:
-            self.io.println('')
-            self.io.println(output)
-            return (cmd_line, [])
+        self.recv_txt.emit()
 
 
 class KeyEventHandler(QtCore.QObject):
-    def __init__(self, window, io_system):
+    def __init__(self, window):
         self.window = window
-        self.state = window.state
+        self.state = window.interpreter.state
         self.output_hist = window.output_hist
 
-        self.io_system = io_system
-        self.io_system.set_flush(self.print_buff)
+        self.output_buffer = []
 
         super().__init__(window)
 
+    # BUG backspace doesn't work.
     def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent):
         UP_ARROW = 16777235
         DOWN_ARROW = 16777237
@@ -247,6 +58,7 @@ class KeyEventHandler(QtCore.QObject):
             if key_event.key() == UP_ARROW:
                 # cover the case when you type something and then want to go back
                 #  store the last typed command on the history buffer fist
+                # BUG we got rid of the cmd_input!!!
                 if index == len(history) and self.cmd_input.text() != '':
                     self.state.command_history.append(self.cmd_input.text())
 
@@ -266,31 +78,103 @@ class KeyEventHandler(QtCore.QObject):
                 self.state.fg_proc.callback(key_event.text())
 
             return True
+        if event.type() == QtCore.QEvent.CursorChange:
+            pass
         else:
             # standard event processing
             return QtCore.QObject.eventFilter(self, obj, event)
 
     def print_buff(self, buff: list):
         for t in buff:
-            self.output_hist.insertPlainText(t)
+            self.output_buffer.append(t)
 
-    def get_io_system(self) -> IOAbstraction:
-        return self.io_system
+        output = ''
+        for t in self.output_buffer:
+            output += t
+
+        self.output_hist.setText(output)
+
+# TODO finish implementing this.
+# TODO the terminal needs a way to send its data out,
+# TODO and to recieve data in.
+class Terminal(QtWidgets.QScrollArea):
+    def __init__(self, parent, istream: Queue, ostream: Queue):
+        super().__init__(parent)
+        self.setWidgetResizable(True)
+
+        self.text = QLabel(self)
+
+        self.text.setWordWrap(True)
+        self.text.setScaledContents(False)
+        self.text.setContentsMargins(0,0,0,0)
+        self.text.setFrameStyle(QtWidgets.QFrame.Box)
+        self.text.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+        self.text.setText('hello there\ngeneral kenobi')
+        self.text.setAlignment(QtCore.Qt.AlignTop)
+
+        super().setWidget(self.text)
+
+        self.istream = istream
+        self.ostream = ostream
+
+    def setText(self, text):
+        self.text.setText(text)
+
+    def keyPressEvent(self, event):
+        UP_ARROW = 16777235
+        DOWN_ARROW = 16777237
+        key_event = QtGui.QKeyEvent(event)
+
+        if key_event.key() == UP_ARROW:
+            pass
+        elif key_event.key() == DOWN_ARROW:
+            pass
+        elif len(key_event.text()) != 0:
+            self.istream.put(key_event.text())
+
+        return True
+
+        if event.type() == QtCore.QEvent.CursorChange:
+            pass
+        else:
+            # standard event processing
+            return QtCore.QObject.eventFilter(self, obj, event)
+
+    def append(self, c:str):
+        txt = self.text.text() + c
+        self.text.setText(txt)
+
+    def recv_text(self):
+        txt = self.text.text()
+        while True:
+            try:
+                c = self.ostream.get_nowait()
+                if len(c) != 1:
+                    raise command_line.LengthError
+
+                if c == '\x7f':
+                    txt = txt[:-1]
+                else:
+                    txt += c
+
+            except Empty:
+                break
+
+        self.text.setText(txt)
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        io_system = IOAbstraction()
-        self.state = State(io_system)
+        self.interpreter = Interpreter()
 
-        self.output_hist = QtWidgets.QTextEdit('')
+        istream = self.interpreter.state.istream
+        ostream = self.interpreter.state.ostream
+        self.output_hist = Terminal(self, istream, ostream)
 
-        """CALCULATOR RUNTIME ENVIRONMENT
-        Written by Ethan Smith and Erik Huuki
-        for a list of available commands, type 'help'
-        """
-        self.output_hist.setReadOnly(True)
+        #self.output_hist.setReadOnly(True)
 
+        # TODO user can move cursor around
+        # TODO auto scroll to bottom
         self.cmd_input = QtWidgets.QLineEdit()
         self.environment_list = QtWidgets.QListWidget()
 
@@ -310,14 +194,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # connect signals/slots
 
-        ev = KeyEventHandler(self, io_system)
-        self.output_hist.installEventFilter(ev)
+        #ev = KeyEventHandler(self)
+        #self.output_hist.installEventFilter(ev)
+        self.interpreter.recv_txt.connect(self.output_hist.recv_text)
+        self.interpreter.flush()
 
         # load icons
         self.expression_list_icon = QtGui.QIcon()
         self.expression_list_icon.addFile("icons/expression_list_item.png")
-
-        self.state.fg_proc.callback('')
 
     def _add_menu_bar(self):
         self.menuBar().setNativeMenuBar(False)
