@@ -406,7 +406,6 @@ class _list(Process):
 
         self.state.put(output)
 
-
 class _help(Process):
     '''provides access to the robust help features of this application.'''
     help_list = [
@@ -457,16 +456,9 @@ class _echo(Process):
 
     def run(self):
         argv = self.argv
-        state.fg_proc = self.parent_process
+        self.state.fg_proc = self.parent_process
 
-        output = ''
-        try:
-            for i in argv[1:]:
-                output += i + ' '
-        except:
-            pass
-
-        self.state.put(output)
+        self.putln(' '.join(argv[1:]))
         return
 
 class _eval(Process):
@@ -484,25 +476,23 @@ class _eval(Process):
 
         # TODO add the ability to parse an expression or expression reference
         if argv[1] not in self.state.expressions:
-            self.state.println('    ERROR: expression "' + argv[1] + '" is not defined.')
+            self.state.putln('    ERROR: expression "' + argv[1] + '" is not defined.')
             return
 
         exp = self.state.expressions[argv[1]]
 
-        exp.evaluate_funcs(self.state.expressions)
+        exp.evaluate_funcs(env=self.state.expressions)
 
         # XXX probably don't need to fix the variables twice.
         # fix the variables
         exp.dir.clear()
         exp.map()
 
-        output = ''
         eval_result = exp.evaluate()
         if eval_result != None:
-            output += '    ⍄ ' + str(eval_result) + '\n'
+            self.putln(f'    ⍄ {str(eval_result)}')
 
-        output += '    ' + argv[1] + ' <- ' + str(exp)
-        self.state.put(output)
+        self.putln(f'    {argv[1]} <- {str(exp)}')
 
 class _table(Process):
     help_lis = [
