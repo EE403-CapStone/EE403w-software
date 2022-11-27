@@ -58,7 +58,12 @@ class expr:
         if s in special_cases:
             return special_cases[s]
 
-        if s[0].isalpha():  # if s begins with a character in the alphabet return s
+        if s[0].isalpha():  # if s begins with a character in the alphabet return s as variable throws an error if incorrect format
+            for l in s:
+                try:
+                    assert l.isalpha() or l.isdigit()
+                except AssertionError:
+                    raise Exception (l+': is not a valid variable')
             return s
         
         # Now assumes string can be transformed to a some constant
