@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 import sys
-from PySide6 import QtCore, QtWidgets, QtGui
-from PySide6.QtCore import QObject, Qt
-from PySide6.QtWidgets import *
+from PySide2 import QtCore, QtWidgets, QtGui
+from PySide2.QtCore import QObject, Qt
+from PySide2.QtWidgets import *
 import command_line
 from command_line import Process
 import io
@@ -149,10 +149,9 @@ class Terminal(QtWidgets.QScrollArea):
     def setText(self, text):
         self.label.setText(text)
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, key_event):
         UP_ARROW = 16777235
         DOWN_ARROW = 16777237
-        key_event = QtGui.QKeyEvent(event)
 
         if key_event.key() == UP_ARROW:
             pass
@@ -249,8 +248,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._add_menu_bar()
 
         # connect signals/slots
-
-        #ev = KeyEventHandler(self)
         self.interpreter.recv_txt.connect(self.terminal.recv_text)
         self.interpreter.flush()
 
@@ -268,14 +265,14 @@ class MainWindow(QtWidgets.QMainWindow):
         funcs_menu = self.menuBar().addMenu('Functions')
         help_menu = self.menuBar().addMenu('Help')
 
-        new_act = QtGui.QAction('New', self)
+        new_act = QtWidgets.QAction('New', self)
         file_menu.addAction(new_act)
 
         for (k,v) in command_line.Exp.funcs.items():
-            funcs_menu.addAction(QtGui.QAction(k, self))
+            funcs_menu.addAction(QtWidgets.QAction(k, self))
 
         for (k,v) in Process.commands.items():
-            action = QtGui.QAction(k, self)
+            action = QtWidgets.QAction(k, self)
 
             # XXX WOOO CLOSURES!!!!
             action.triggered.connect((lambda cmd: lambda: self.terminal.tx(f'\nhelp {cmd.__name__[1:]}\n'))(v))
@@ -337,7 +334,7 @@ if __name__ == "__main__":
     widget.resize(800, 600)
     widget.show()
 
-    app.exec()
+    app.exec_()
 
     widget.terminal.exit()
     sys.exit()
