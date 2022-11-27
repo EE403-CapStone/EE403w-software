@@ -25,6 +25,14 @@ class State:
     interfacing to a  front end, the user  may encapsulate State in  a new class
     and  override  its put  method  to  signal an  update  to  the display  (for
     example).
+
+    the output functions (put, putln) treat the display device on the end of the
+    ostream as if it were a terminal in raw mode.
+
+    the  input  functions  get  and  getline perform  line  discipline  for  the
+    processes.  if a  process wants  a different  line discipline  (canonical is
+    provided by  default) then they  can override the  put and putln  (more line
+    disciplines may be provided in the future)
     '''
     def __init__(self):
         self.expressions = {}
@@ -51,18 +59,20 @@ class State:
         kind of  signal to update  their display buffer. otherwise,  the ostream
         needs to be polled.
         '''
-        # NOTE: this can probably be optimized. it doesn't really need to send
-        # strings one character at a time.
         for c in s:
-            self.ostream.put(c)
+            if c in '\r\n':
+                self.ostream.put('\r\n')
+            else:
+                self.ostream.put(c)
 
     def putln(self, s: str = None):
         '''like put, but adds a newline to the end.'''
-        if s != None:
-            for c in s:
-                self.ostream.put(c)
+        if s == None:
+            self.ostream.put('\r\n')
+            return
 
-        self.ostream.put('\n')
+        self.put(s)
+        self.ostream.put('\r\n')
 
     def get(self):
         '''
@@ -84,21 +94,25 @@ class State:
         this functions performs  the line editing operations that  you would see
         from a tty driver (ie backspace, echoing the character, etc.)
         '''
+        block = '█'
         line = ''
         while True:
+            self.put(block + '\010')
+
             # get and validate a character
             c = self.istream.get()
             if len(c) != 1:
                 raise LengthError
 
             if c in '\n\r':
+                self.put(' ') # erase cursor
                 break
-            elif c == '\x7f':
+            elif c in '\177\010': #DEL or BS
                 if len(line) > 0:
                     line = line[:-1]
-                    self.put(c)
+                    self.put(' \010\010') # delete block, move cursor back
             else:
-                self.put(c)
+                self.put(c) # replace cursor with character
                 line += c
 
         return line
@@ -235,14 +249,14 @@ class cmd_line(Process):
     user.
     '''
     def run(self):
-        intro_text = """
+        intro_text = '''\
         CALCULATOR RUNTIME ENVIRONMENT
         Written by Ethan Smith and Erik Huuki
         for a list of available commands, type 'help'
-        """
+        '''
 
         self.state.put(dedent(intro_text))
-        self.state.put('\n')
+        self.state.putln()
 
         while True:
             # print prompt
