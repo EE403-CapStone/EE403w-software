@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.8
 import os
 import openai
 import dotenv
@@ -27,8 +28,7 @@ class convo:
     self.context[:4] = self.context[2:]
     self.context[4] = user
     self.context[5] = mathilda
-  
-  
+
 def test_prompt():
   response = openai.Completion.create(
   model="text-davinci-002",
