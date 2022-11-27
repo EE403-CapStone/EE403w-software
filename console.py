@@ -1,101 +1,70 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 import sys
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide2 import QtCore, QtWidgets, QtGui
+from PySide2.QtCore import QObject, Qt
+from PySide2.QtWidgets import *
 import command_line
-from command_line import Command
-"""
-returns the arguments of cmd_string
-"""
-def trim_command(cmd_string):
-    if not ' ' in cmd_string:
-        return '' # there is only one token in this string
+from command_line import Process
+import io
+from queue import Queue, Empty
+import threading
+from collections import namedtuple
 
-    n = cmd_string.find(' ')
-    return cmd_string[n+1:]
+class Interpreter(QObject):
+    '''
+    Wrapper/Interface  between   calculator  runtime  application  and   the  Qt
+    environment.  Emits a  signal whenever  there is  output which  needs to  be
+    displayed to the  screen. a slot in  the terminal is then  connected to this
+    signal prints text from the ostream to its internal buffer.
 
+    It derives  from QObject  so that  it can  be integrated  into the  Qt Event
+    system
+    '''
 
-"""
-The State class contains the current state of the application.
-it provides methods which can be used to modify the state, or be bound
-to commands which are then typed by the user.
+    class State(command_line.State):
+        '''wrapper class to extend functionality of put method'''
+        def __init__(self, interp):
+            super().__init__()
+            self.interp = interp
+        def put(self, s: str):
+            super().put(s)
+            self.interp.recv_txt.emit()
 
-this design pattern allows the interface type to be easily interchangable (ie, output
-using curses to terminal, create a custom window with a graphcis library such as WebGPU
-or OpenGL and draw to a pixel buffer)
-"""
-class State:
+    recv_txt = QtCore.Signal()
     def __init__(self):
-        self.expressions = {}
-        self.exit_prog = False
-        self.command_buffer = [] # commands which need to be processed
-        self.output_buffer = [] # lines which need to be printed to the screen
+        super().__init__()
 
-        self.command_history = [] # list of commands which were entered by the user.
-        self.command_history_index = 0 # this is the current place in the command history
+        self.state = Interpreter.State(self)
 
-        Command.state = self
+        self.t = threading.Thread(target=self._run)
+        self.t.start()
 
-    def print(self, txt):
-        self.output_buffer.append(str(txt))
+    def _run(self):
+        '''target for thread object'''
+        self.state.fg_proc.run()
+        QtWidgets.QApplication.quit()
 
-    def process_cmd(self):
-        cmd = self.command_buffer.pop()
-        self.command_history.append(cmd)
-        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
-
-        if cmd is None or cmd == '':
-            return
-
-        # determine if output should be supressed
-        suppress_output = False
-        if cmd[-1] == ';':
-            suppress_output = True
-            cmd = cmd[:-1]
-
-        argv = cmd.split(' ')
-
-        # remove blank tokens from superfluous whitespace
-        while argv.count('') != 0:
-            argv.remove('')
-
-        # TODO the implied set_expr is not implemented yet.
-
-        output = ''
-        # check if this is the colon notation for set_expr
-        # argv = [':', 'EXPRESSION_HANDLE', a+b=c]
-        if argv[0] in Command.commands:
-            output = Command.commands[argv[0]].callback(argv)
-        elif argv[0].count(':') == 1:
-            argv.insert(0, ':')
-            output = Command.commands[argv[0]].callback(argv)
-        elif argv[1].count(':') == 1:
-            arg = argv[1].split(':')
-            if len(arg) > 2:
-                output = 'Error: malformed command'
-            elif arg[0] != '':
-                output = 'Error: malformed command'
-            else:
-                argv.insert(0, ':')
-                argv[2] = arg[1]
-                output = Command.commands[argv[0]].callback(argv)
-        else:
-            output = ('"' + argv[0] + '" is not a recognized command or script.')
-
-        # don't print if there was a semicolon at the end of the input
-        if suppress_output:
-            return
-        else:
-            self.print(output)
+    def flush(self):
+        '''tells anything looking for text in ostream to check the queue.'''
+        self.recv_txt.emit()
 
 
 class KeyEventHandler(QtCore.QObject):
+    '''
+    DEPRECATION WARNING
+    this code  is pretty much  entirely deprecated. it  is only here  because it
+    contains functionality which needs to be ported over to the Terminal class
+    '''
     def __init__(self, window):
         self.window = window
-        self.state = window.state
-        self.cmd_input = window.cmd_input
+        self.state = window.interpreter.state
+        self.output_hist = window.output_hist
+
+        self.output_buffer = []
 
         super().__init__(window)
 
+    # BUG backspace doesn't work.
     def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent):
         UP_ARROW = 16777235
         DOWN_ARROW = 16777237
@@ -109,6 +78,7 @@ class KeyEventHandler(QtCore.QObject):
             if key_event.key() == UP_ARROW:
                 # cover the case when you type something and then want to go back
                 #  store the last typed command on the history buffer fist
+                # BUG we got rid of the cmd_input!!!
                 if index == len(history) and self.cmd_input.text() != '':
                     self.state.command_history.append(self.cmd_input.text())
 
@@ -125,53 +95,163 @@ class KeyEventHandler(QtCore.QObject):
                     self.cmd_input.clear()
 
             else:
-                return QtCore.QObject.eventFilter(self, obj, event)
+                self.state.fg_proc.callback(key_event.text())
 
             return True
+        if event.type() == QtCore.QEvent.CursorChange:
+            pass
         else:
             # standard event processing
             return QtCore.QObject.eventFilter(self, obj, event)
 
+    def print_buff(self, buff: list):
+        for t in buff:
+            self.output_buffer.append(t)
+
+        output = ''
+        for t in self.output_buffer:
+            output += t
+
+        self.output_hist.setText(output)
+
+class Terminal(QtWidgets.QScrollArea):
+    '''
+    "Dumb" terminal. It does dumb terminal things, like send/recieve characters,
+    and print the characters it revieves to the screen.
+
+    soon it will support even more dumb terminal things, like a cursor.
+    '''
+    def __init__(self, parent, istream: Queue, ostream: Queue):
+        super().__init__(parent)
+        self.setWidgetResizable(True)
+
+        self.label = QLabel(self)
+
+        self.label.setStyleSheet('background-color: white')
+        self.label.setWordWrap(True)
+        self.label.setContentsMargins(5,5,5,5)
+        self.label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+        self.label.setAlignment(QtCore.Qt.AlignTop)
+        self.setFrameStyle(QtWidgets.QFrame.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+        super().setWidget(self.label)
+
+        self.istream = istream
+        self.ostream = ostream
+
+        # cursor position
+        self.cur_x = 0
+        self.cur_y = 0
+
+        self.linebuf = [[]]
+
+    def setText(self, text):
+        self.label.setText(text)
+
+    def keyPressEvent(self, key_event):
+        UP_ARROW = 16777235
+        DOWN_ARROW = 16777237
+
+        if key_event.key() == UP_ARROW:
+            pass
+        elif key_event.key() == DOWN_ARROW:
+            pass
+        elif len(key_event.text()) != 0:
+            self.istream.put(key_event.text())
+
+        return True
+
+        if event.type() == QtCore.QEvent.CursorChange:
+            pass
+        else:
+            # standard event processing
+            return QtCore.QObject.eventFilter(self, obj, event)
+
+    def refresh_text(self):
+        text = ''
+        for line in self.linebuf:
+            text += ''.join(line) + '\n'
+
+        self.setText(text)
+
+    def write(self, txt:str):
+        for c in txt:
+            # create new lines as needed
+            while len(self.linebuf) <= self.cur_y:
+                self.linebuf.append([])
+
+            # create space in line as needed
+            while len(self.linebuf[self.cur_y]) <= self.cur_x:
+                self.linebuf[self.cur_y].append(' ')
+
+            if c == '\n':
+                self.cur_y += 1
+            elif c == '\r':
+                self.cur_x = 0
+            elif c == '\177': #DEL
+                self.linebuf[self.cur_y][self.cur_x] = ' '
+            elif c == '\010': #BS
+                if self.cur_x >= 1:
+                    self.cur_x -= 1
+            else:
+                self.linebuf[self.cur_y][self.cur_x] = c
+                self.cur_x += 1
+
+        self.refresh_text()
+
+    def recv_text(self):
+        while True:
+            try:
+                c = self.ostream.get_nowait()
+
+                self.write(c)
+            except Empty:
+                break
+
+        # scroll output view to bottom if necessary
+        # BUG the scroll view isn't getting updated for some reason.
+        scrollbar = self.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def tx(self, s: str):
+        for c in s:
+            self.istream.put(c)
+
+    def exit(self):
+        for c in 'exit\n':
+            self.istream.put(c)
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.state = State()
+        self.interpreter = Interpreter()
 
-        self.command_buffer = [] # list of commands which still need to be processed
+        istream = self.interpreter.state.istream
+        ostream = self.interpreter.state.ostream
+        self.terminal = Terminal(self, istream, ostream)
 
-        # history output. FIXME text is vertically aligned at top of frame
-        # TODO add label widget next to line entry widget
-        self.output_hist = QtWidgets.QTextEdit('')
-        self.output_hist.setText(
-"""CALCULATOR RUNTIME ENVIRONMENT
-Written by Ethan Smith and Erik Huuki
-for a list of available commands, type 'help'
-"""
-        )
-        self.output_hist.setReadOnly(True)
+        #self.terminal.setReadOnly(True)
 
-        self.cmd_input = QtWidgets.QLineEdit()
         self.environment_list = QtWidgets.QListWidget()
+        self.environment_list.setFrameStyle(QtWidgets.QFrame.Panel)
+        self.environment_list.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         # create main layout, QWindow (I think) is its parent
         self.setCentralWidget(QtWidgets.QWidget()) # central widget needs a placeholder
 
-        self.layout = QtWidgets.QVBoxLayout(self.centralWidget()) # add layout to central widget
-        self.hlayout = QtWidgets.QHBoxLayout()
-        self.hlayout.addWidget(self.output_hist, stretch=10)
-        self.hlayout.addWidget(self.environment_list)
-
-        self.layout.addLayout(self.hlayout)
-        self.layout.addWidget(self.cmd_input)
+        self.layout = QtWidgets.QHBoxLayout(self.centralWidget()) # add layout to central widget
+        self.layout.addWidget(self.terminal, stretch=10)
+        self.layout.addWidget(self.environment_list)
 
         # add menu bar
         self._add_menu_bar()
 
         # connect signals/slots
-        self.cmd_input.returnPressed.connect(self.on_enter)
+        self.interpreter.recv_txt.connect(self.terminal.recv_text)
+        self.interpreter.flush()
 
-        ev = KeyEventHandler(self)
-        self.cmd_input.installEventFilter(ev)
+        self.interpreter.recv_txt.connect(self.update_listview)
 
         # load icons
         self.expression_list_icon = QtGui.QIcon()
@@ -179,60 +259,40 @@ for a list of available commands, type 'help'
 
     def _add_menu_bar(self):
         self.menuBar().setNativeMenuBar(False)
-
+        # TODO add edit/application menu item to allow changing fonts etc.
         file_menu = self.menuBar().addMenu('File')
         graph_menu = self.menuBar().addMenu('Graph')
         funcs_menu = self.menuBar().addMenu('Functions')
         help_menu = self.menuBar().addMenu('Help')
 
-        new_act = QtGui.QAction('New', self)
+        new_act = QtWidgets.QAction('New', self)
         file_menu.addAction(new_act)
 
         for (k,v) in command_line.Exp.funcs.items():
-            funcs_menu.addAction(QtGui.QAction(k, self))
+            funcs_menu.addAction(QtWidgets.QAction(k, self))
 
-        for (k,v) in Command.commands.items():
-            action = QtGui.QAction(k, self)
+        for (k,v) in Process.commands.items():
+            action = QtWidgets.QAction(k, self)
 
             # XXX WOOO CLOSURES!!!!
-            action.triggered.connect((lambda cmd: lambda: self.print(cmd.help()))(v))
-            #action.triggered.connect(tmp)
+            action.triggered.connect((lambda cmd: lambda: self.terminal.tx(f'\nhelp {cmd.__name__[1:]}\n'))(v))
 
             help_menu.addAction(action)
 
         self.menuBar().addAction(new_act)
 
-    @QtCore.Slot()
-    def on_enter(self):
-        self.state.command_buffer.append(self.cmd_input.text())  # put command in line to be processed
-        self.state.output_buffer.append(self.cmd_input.text())   # record command in output
-        self.cmd_input.clear()
 
-
-        self.state.process_cmd()
-
-        for t in self.state.output_buffer:
-            self.output_hist.append(t)
-
-        self.state.output_buffer.clear()
-        self.state.output_buffer.append('') # add a blank line for formatting
-
-        # update the list view
+    def update_listview(self):
         self.environment_list.clear()
-
-        for e in self.state.expressions:
-            label = e + ': ' + str(self.state.expressions[e])
+        exprs = self.interpreter.state.expressions
+        for e in exprs:
+            label = f'{e}: {str(exprs[e])}'
 
             item = QtWidgets.QListWidgetItem()
             item.setIcon(self.expression_list_icon)
             item.setText(label)
 
             self.environment_list.addItem(item)
-
-    #BUG: output isn't shown immediately, user has to press enter first
-    @QtCore.Slot(str)
-    def print(self, txt):
-        self.state.output_buffer.append(txt)   # record command in output
 
 """
 this is the user input loop. It collects and parses user input.
@@ -274,6 +334,7 @@ if __name__ == "__main__":
     widget.resize(800, 600)
     widget.show()
 
-    app.exec()
+    app.exec_()
 
+    widget.terminal.exit()
     sys.exit()

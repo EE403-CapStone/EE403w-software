@@ -1,76 +1,373 @@
 from axioms_2 import expr as ExpBase
 from axioms_2 import node
+from queue import Queue
+import threading
+from textwrap import dedent, indent
 
-"""
-Command Line
+class LengthError(Exception):
+    '''
+    Raised when there the text in the input/output queues are not exactly 1
+    character long
+    '''
+    def __str__(self):
+        return 'LengthError: the terminal sent a string with a size other than 1'
 
-this file defines the commands which are able to be run on the command line.
-new commands are created by creating a new class which inherits Command.
-this new class must override the callback function. See commands like _set_expr
-for an example.
+class State:
+    '''
+    provides  attributes and  methods  which  define the  current  state of  the
+    runtime environment.  input/output, expressions,  command history,  and many
+    other things are stored in this class.
 
-it is crucial to create at least one instance of the class in this file.
-whenever this module is imported into the console.py file, all the subclasses
-need to be registered to the Command class. This is done automatically upon
-instantiation of the subclass (when super().__init__(...) is called).
-"""
+    In order  to start  the application,  an instant of  State must  be created,
+    then, fg_proc().run() must  be called. This starts the  first process, which
+    is by  default, the  command line. All  Processes send/recieve  their inputs
+    through  the  istream/ostream  queues.  This  class  is  thread  safe.  When
+    interfacing to a  front end, the user  may encapsulate State in  a new class
+    and  override  its put  method  to  signal an  update  to  the display  (for
+    example).
 
-"""
-New commands must derive from this class.
+    the output functions (put, putln) treat the display device on the end of the
+    ostream as if it were a terminal in raw mode.
 
-there are two static fields:
-    - commands: a dictionary of all the commands currently registered
-    - state: a handle to the current state of the application
-"""
-class Command:
-    # all of the defined commands
+    the  input  functions  get  and  getline perform  line  discipline  for  the
+    processes.  if a  process wants  a different  line discipline  (canonical is
+    provided by  default) then they  can override the  put and putln  (more line
+    disciplines may be provided in the future)
+    '''
+    def __init__(self):
+        self.expressions = {}
+        self.exit_prog = False
+
+        self.istream = Queue()
+        self.ostream = Queue()
+
+        # process which will be called
+        self.fg_proc = cmd_line([], self)
+
+        self.command_history = [] # list of commands which were entered by the user.
+        self.command_history_index = 0 # this is the current place in the command history
+
+    def push_cmd(self, cmd:str):
+        self.command_history.append(cmd)
+        self.command_history_index = len(self.command_history) # processing a command resets the history index to the end
+
+    def put(self, s: str):
+        '''
+        sends a string down the output pipe.
+
+        front-end implementations may want to  override this method to send some
+        kind of  signal to update  their display buffer. otherwise,  the ostream
+        needs to be polled.
+        '''
+        for c in s:
+            if c in '\r\n':
+                self.ostream.put('\r\n')
+            else:
+                self.ostream.put(c)
+
+    def putln(self, s: str = None):
+        '''like put, but adds a newline to the end.'''
+        if s == None:
+            self.ostream.put('\r\n')
+            return
+
+        self.put(s)
+        self.ostream.put('\r\n')
+
+    def get(self):
+        '''
+        reads  a character  from the  input  \'stream\'. Blocks  until there  is
+        something in the queue.
+        '''
+        c = self.istream.get()
+
+        if len(c) != 1:
+            raise LengthError
+
+        return c
+
+    def getline(self):
+        '''
+        reads a line from the input  \'stream\'. Blocks until there is something
+        in the queue.
+
+        this functions performs  the line editing operations that  you would see
+        from a tty driver (ie backspace, echoing the character, etc.)
+        '''
+        block = '█'
+        line = ''
+        while True:
+            self.put(block + '\010')
+
+            # get and validate a character
+            c = self.istream.get()
+            if len(c) != 1:
+                raise LengthError
+
+            if c in '\n\r':
+                self.put(' ') # erase cursor
+                break
+            elif c in '\177\010': #DEL or BS
+                if len(line) > 0:
+                    line = line[:-1]
+                    self.put(' \010\010') # delete block, move cursor back
+            else:
+                self.put(c) # replace cursor with character
+                line += c
+
+        return line
+
+class Process:
+    """
+    All Commands/Processes must derive from this class. If the process should be
+    callable from  the command line,  then it needs  to be registered  using the
+    register function.
+
+    command  class names  must follow  this naming  convention: '_somecmd'.  the
+    class  name is  used to  identify the  command the  user types.  Alternative
+    spellings for commands  may be defined by setting cmd_str  to something oher
+    than none.  Help text is generated  for each command through  the statically
+    assigned help_list attribute.  every subclass should redefine  this to suite
+    its needs.
+
+    DEPRECATION  WARNING
+    Whenever a  process is called,  it tracks the  parent process, and  sets the
+    state foreground process tracker to  itself. Once the process is terminated,
+    the foreground process  must be restored. This process may  be deprecated in
+    the future.  Originally, the  callback function every  time a  character was
+    typed, so  this was needed to  track which callback to  call. Now, Processes
+    use  blocking input  functions,  so  it no  longer  necessary  to track  the
+    callback like this.
+
+    Required Static Fields in Subclasses:
+        - help_list: list
+        - cmd_str: str (or none)
+
+    Override Methods:
+        - run()
+
+    Static Fields:
+        - commands: a dictionary of all the commands currently registered
+        - help_list: list of tuples of the form (title:str, body:str). Provided
+          here for reference.
+    """
+    # dict of all defined commands
     commands = {}
 
-    # handle to application state.
-    # THIS MUST BE SET
-    state = None
+    # help_list should be re-defined in each sub-class
+    help_list = [
+        ('Description', None),
+        ('Input', None),
+        ('Output', None),
+        ('Effects', None),
+        ('Usage', None)
+    ]
 
-    # TODO change help_str into a dictionary of sections and section text. example:
-    #  {'Description': 'Default Description', 'Usage': 'Default Usage'}
-    def __init__(self, cmd_str:str, help_str:str, callback=None):
-        self.cmd_str = cmd_str
-        self.help_str = help_str
-        self.callback = callback
-        Command.commands[cmd_str] = self
+    cmd_str = None
 
-    def help(self) -> str:
-        return self.help_str
+    def __init__(self, argv: list, state):
+        '''
+        argv: list of arguments which are provided to the application
+        state: reference to the state
+        stdout: output stream
+        '''
+        self.state = state
 
-    def callback(argv: list) -> str:
+        # track parent process
+        try:
+            self.parent_process = self.state.fg_proc
+        except AttributeError:
+            self.parent_process = None
+
+        # set self as foreground process
+        self.state.fg_proc = self
+
+        # save argv for interactive processes
+        self.argv = argv
+
+    def run(self):
         return "default callback"
 
+    def help(self) -> str:
+        '''
+        Uses the  statically defined help_list  (redefined in each  subclass) to
+        generate  and format  help  text  for the  command.  If help_list  isn't
+        defined in the  subclass, the the default one in  Process is used (where
+        everything is none.)
+        '''
+        help_txt = ''
+        for (title, content) in self.help_list:
+            if content == None:
+                continue
 
-class _set_expr(Command):
-    def __init__(self):
-        cmd_str = "setexpr"
-        help_str = "Description: binds an expression to an expression object\nUsage: setexpr EXP_NAME EXPRESSION"
+            help_txt += title.upper() + '\n'
+            help_txt += indent(dedent(content), '    ') + '\n'
 
-        super().__init__(cmd_str, help_str, _set_expr.callback)
+        # tell the user if nothing was defined for the command
+        if help_txt == '':
+            help_txt = 'No documentation has been defined for this command'
 
-        # TODO add specific help instructions for this syntax
-        super().__init__(":", help_str, _set_expr.callback) # also initialize an instance for colon operator
+        return help_txt
+
+    def register(proc):
+        '''
+        registers this process as a callable command.
+
+        if cmdstr  is not  defined in  the class statically,  the class  name is
+        used. it  uses the class  name (without  the leading underscore)  as the
+        name of  the class this  function requires an  instance of the  class to
+        register (though this instance is not referenced).
+
+        example command registration: 'Process.register(_somecmd)'
+        '''
+        cmd_str = proc.__name__[1:]
+
+        # use registered cmd_string if applicable
+        if proc.cmd_str != None:
+            cmd_str = proc.cmd_str
+
+        Process.commands[cmd_str] = proc
+
+
+    def putln(self, s: str):
+        '''helper function to reduce typing'''
+        self.state.putln(s)
+    def put(self, s: str):
+        '''helper function to reduce typing'''
+        self.state.put(s)
+    def get(self):
+        '''helper function to reduce typing'''
+        return self.state.get()
+    def getline(self):
+        '''helper function to reduce typing'''
+        return self.state.getline()
+
+class cmd_line(Process):
+    '''
+    This process is akin to bash, zsh, or any other shell in a unix system. It's
+    job is  to collect  input, run  programs, and present  their outputs  to the
+    user.
+    '''
+    def run(self):
+        intro_text = '''\
+        CALCULATOR RUNTIME ENVIRONMENT
+        Written by Ethan Smith and Erik Huuki
+        for a list of available commands, type 'help'
+        '''
+
+        self.state.put(dedent(intro_text))
+        self.state.putln()
+
+        while not self.state.exit_prog:
+            # print prompt
+            self.state.put('> ')
+
+            # get user input
+            try:
+                line = self.state.getline()
+            except Exception as e:
+                self.state.put(f'Input Error: {str(e)}')
+                continue
+
+            try:
+                self.state.putln()
+                self._run_cmd(line)
+            except Exception as e:
+                self.state.putln('ERROR: there was a problem processing that command')
+                self.state.putln(str(e) + ', ' + str(type(e)))
+
+    def _run_cmd(self, cmd: str):
+        '''helper function which reduces special syntax'''
+        # case where use just pressed enter
+        if cmd == '':
+            return
+
+        # determine if output should be supressed
+        suppress_output = False
+        if cmd[-1] == ';':
+            suppress_output = True
+            cmd = cmd[:-1]
+
+        argv = cmd.split(' ')
+
+        # remove blank tokens from superfluous whitespace
+        while argv.count('') != 0:
+            argv.remove('')
+
+        # TODO the implied set_expr is not implemented yet.
+        # TODO implement supressed output
+
+        # see if the command is registered
+        if argv[0] in Process.commands:
+            # command isn't using ':' notation
+            Process.commands[argv[0]](argv, self.state).run()
+            return
+
+        # Command could be in colon notation
+        # Proper colon notation:
+        #  F: a+b=c
+        #  F :a+b=c
+        #  F : a+b=c
+        #  F:a+b=c
+        # Improper colon notation (error):
+        #  F:
+        #  F:: a+b=c
+        #  F :: a+b=c
+        #  F ::a+b=c
+        #  F::a+b=c
+        #
+        # essentially, as long as there is only one colon in the command, then
+        # the format is valid.
+        colon_fmt = cmd.split(':')
+        if len(colon_fmt) == 2:
+            argv = ['setexpr', colon_fmt[0], colon_fmt[1]]
+            Process.commands[argv[0]](argv, self.state).run()
+            return
+
+        self.putln(f'command not found: "{argv[0]}"')
+        return
+
+    def __str__(self):
+        return 'cmd_line {\n' +\
+        f'    current_line: {self.current_line}\n' +\
+        f'    self.return_from_call: {self.return_from_call}\n' +\
+        '}'
+
+
+class _setexpr(Process):
+    """
+    This command supports colon syntax. use 'setexpr' when indexing this process
+    in Process.commands
+    """
+    help_list = [
+        ('Description', 'binds an expression to an expression object'),
+        ('Usage', 'setexpr EXP_NAME EXPRESSION')
+    ]
 
     # argv[0]: : or setexpr
     # argv[1]: expression symbol (ex. 'ans')
     # argv[2]: expression value (ex. 'x+y=2')
-    def callback(argv:list) -> str:
-        # handle colon operator syntax
-        if argv[0] == ':':
-            arg = argv[1].split(':') # separate expression name from the expression (ie. EXP:a+b=c)
+    def run(self):
+        self.state.fg_proc = self.parent_process
+        argv = self.argv
 
-            if len(arg) == 1:
-                pass
-            else:
-                argv[1] = arg[0] # add the name of the expression to argument list
-                argv.insert(2, arg[1]) # add the first part of the expression to the argument list
+        # argv must be at least three to be functional (if its just one, print
+        # the help text)
+        # ['setexpr', 'name', 'expression', ...]
+        if len(argv) == 1:
+            self.putln(self.help())
+        elif len(argv) < 3:
+            self.putln('argument error: expected at least 2, got 1')
+            return
 
-        if argv[0] == 'setexpr' and len(argv) <= 1:
-            return('Error: not supported!')
+        # remove any leading/trailing whitespace
+        argv[1] = argv[1].strip()
+
+        forbidden_chars = '+=*&^%$#@!~`\|(){}[];:\'"/?.>,<`'
+        for c in argv[1]:
+            if c in forbidden_chars:
+                self.putln(f'invalid character errror: "{c}"')
+                return
 
         if argv[1] == '':
             argv[1] = 'ans'
@@ -79,112 +376,140 @@ class _set_expr(Command):
         for e in argv[2:]:
             exp_str += e
 
-        expression = Exp(exp_str)
+        try:
+            expression = Exp(exp_str)
+        except Exception as e:
+            self.putln(f'expression format error: {e}')
+            return
 
-        Command.state.expressions[argv[1]] = expression
+        self.state.expressions[argv[1]] = expression
 
-        output = ''
         eval_result = expression.evaluate()
         if eval_result != None:
-            output += '    ⍄ ' + str(eval_result) + '\n'
+            self.putln(f'    ⍄ {str(eval_result)}')
 
-        output += '    ' + argv[1] + ' <- ' +  str(Command.state.expressions[argv[1]])
-        return(output)
+        self.putln(f'    {argv[1]} <- {str(self.state.expressions[argv[1]])}')
 
-class _list_expr(Command):
-    def __init__(self):
-        cmd_str = "list"
-        help_str = "Description: displays currently defined expressions\nUsage: list"
+class _list(Process):
+    '''lists all the expressions which are currently defined.'''
+    help_list = [
+        ('Description', 'displays currently defined expressions'),
+        ('Usage', 'list')
+    ]
 
-        super().__init__(cmd_str, help_str, _list_expr.callback)
+    def run(self):
+        self.state.fg_proc = self.parent_process
 
-    def callback(argv:list) -> str:
         output = ''
-        for k,e in Command.state.expressions.items():
+        for k,e in self.state.expressions.items():
             output += str(k) + ': ' + str(e) + '\n'
 
-        return output
+        self.state.put(output)
 
-class _help(Command):
-    def __init__(self):
-        cmd_str = "help"
-        help_str = "Description: displays help text for a given command\nUsage: help COMMAND\n       help all #to display all commands"
-
-        super().__init__(cmd_str, help_str, _help.callback)
+class _help(Process):
+    '''provides access to the robust help features of this application.'''
+    help_list = [
+        ('Description', 'displays help text for a given command'),
+        ('Usage', \
+        '''\
+        help COMMAND   # to see help on a specific command
+        help all       # to see all available commands
+        ''')
+    ]
 
     # argv[0]: help
     # argv[1]: COMMAND
-    def callback(argv:list) -> str:
+    def run(self):
+        argv = self.argv
+        self.state.fg_proc = self.parent_process
+
         output = ''
         if len(argv) == 1:
-            output = Command.commands['help'].help()
+            self.putln(self.commands['help']([], self.state).help())
         elif argv[1] == 'all':
-            for cmd in Command.commands:
-                output += cmd+'\n'
+            for cmd in self.commands:
+                self.state.putln(cmd)
 
-            output += '\nuse "help COMMAND" to get details on a specific command'
+            self.state.putln('\nuse "help COMMAND" to get details on a specific command')
         else:
-            if argv[1] in Command.commands:
-                output += 'help page for "' + argv[1] + '"\n'
-                output += Command.commands[argv[1]].help()
+            if argv[1] in self.commands:
+                self.putln(self.commands[argv[1]]([], self.state).help())
             else:
-                output += 'the command "' + argv[1] + '" is not a valid command'
+                self.putln(f'the command "{argv[1]}" is not a valid command')
 
-        # add some indentation for more readability
-        output = '    ' + output.replace('\n', '\n    ')
+        return
 
-        return output
-
-class _exit(Command):
-    def __init__(self):
-        cmd_str = "exit"
-        help_str = "Description: exits calculator program\nUsage: exit"
-
-        super().__init__(cmd_str, help_str, _exit.callback)
-
+class _exit(Process):
+    '''supposedly exits the application.'''
     # argv[0]: exit
-    def callback(argv:list) -> str:
-        Command.state.exit_prog = True
+    def run(self):
+        self.state.fg_proc = self.parent_process
 
-class _eval(Command):
-    def __init__(self):
-        cmd_str = "eval"
-        help_str = "Description: Evaluates expression (functions, numerica values, etc.)\nUsage: eval EXPRESSION"
+        self.state.exit_prog = True
 
-        super().__init__(cmd_str, help_str, _eval.callback)
+class _echo(Process):
+    '''prints its arguments to the screen'''
+    help_list = [
+        ('Description', 'print the arguments onto the screen.'),
+        ('Usage', 'echo hello world')
+    ]
+
+    def run(self):
+        argv = self.argv
+        self.state.fg_proc = self.parent_process
+
+        self.putln(' '.join(argv[1:]))
+        return
+
+class _eval(Process):
+    '''evaluates the given expression'''
+    help_list = [
+        ('Description', 'Evaluates expression (functions, numerica values, etc.)'),
+        ('Usage', 'eval EXPRESSION')
+    ]
 
     # argv[0]: eval
     # argv[1]: EXPRESSION
-    def callback(argv:list) -> str:
+    def run(self):
+        argv = self.argv
+        self.state.fg_proc = self.parent_process
+
         # TODO add the ability to parse an expression or expression reference
-        if argv[1] not in Command.state.expressions:
-            return '    ERROR: expression "' + argv[1] + '" is not defined.'
+        if argv[1] not in self.state.expressions:
+            self.state.putln('    ERROR: expression "' + argv[1] + '" is not defined.')
+            return
 
-        exp = Command.state.expressions[argv[1]]
+        exp = self.state.expressions[argv[1]]
 
-        exp.evaluate_funcs(env=Command.state.expressions)
+        exp.evaluate_funcs(env=self.state.expressions)
 
         # XXX probably don't need to fix the variables twice.
         # fix the variables
         exp.dir.clear()
         exp.map()
 
-
-        output = ''
         eval_result = exp.evaluate()
         if eval_result != None:
-            output += '    ⍄ ' + str(eval_result) + '\n'
+            self.putln(f'    ⍄ {str(eval_result)}')
 
+        self.putln(f'    {argv[1]} <- {str(exp)}')
 
-        output += '    ' + argv[1] + ' <- ' + str(exp)
-        return(output)
+class _table(Process):
+    help_lis = [
+        ('Description', 'Creates a table of values which can be used for plotting, evaluating, etc.'),
+        ('Usage', 'table l w')
+    ]
 
-# register predefined commands.
-_set_expr()
-_list_expr()
-_help()
-_exit()
-_eval()
+    def run(self, argv: list, state):
+        pass
+
+Process.register(_setexpr)
+Process.register(_list)
+Process.register(_help)
+Process.register(_exit)
+Process.register(_echo)
+Process.register(_eval)
+Process.register(_table)
 
 ################################################
 class ExpFunctionError(Exception):
