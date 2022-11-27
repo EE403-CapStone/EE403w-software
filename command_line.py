@@ -258,7 +258,7 @@ class cmd_line(Process):
         self.state.put(dedent(intro_text))
         self.state.putln()
 
-        while True:
+        while not self.state.exit_prog:
             # print prompt
             self.state.put('> ')
 

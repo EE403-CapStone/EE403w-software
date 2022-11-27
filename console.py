@@ -42,6 +42,7 @@ class Interpreter(QObject):
     def _run(self):
         '''target for thread object'''
         self.state.fg_proc.run()
+        QtWidgets.QApplication.quit()
 
     def flush(self):
         '''tells anything looking for text in ostream to check the queue.'''
