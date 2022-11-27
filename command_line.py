@@ -3,6 +3,8 @@ from axioms_2 import node
 from queue import Queue
 import threading
 from textwrap import dedent, indent
+import string
+import assistant
 
 class LengthError(Exception):
     '''
@@ -96,6 +98,12 @@ class State:
         '''
         block = '█'
         line = ''
+
+        line_pos = 0
+        final_set = string.ascii_letters + '@[]\\^_`{}|~'
+        escape_seq = False
+        escape_code = ''
+
         while True:
             self.put(block + '\010')
 
@@ -104,15 +112,49 @@ class State:
             if len(c) != 1:
                 raise LengthError
 
+            # process the escape code (but don't print it)
+            while escape_seq:
+                escape_code += c
+                if c in final_set:
+                    self.escape_sequence(escape_code)
+                    escape_seq = False
+
+                c = self.istream.get()
+
+            # handle escape codes (if applicable)
+            if escape_code.strip(' ') == '\033[D': # left arrow
+                if line_pos > 0:
+                    # uninvert current character
+                    self.put('\033[27m' + line[line_pos-1])
+
+                    # invert previous character
+                    self.put('\033[2D\033[7m' + line[line_pos-2])
+
+                    line_pos -= 1
+            if escape_code.strip(' ') == '\033[C': # right arrow
+                if line_pos < len(line):
+                    # uninvert current character
+                    self.put('\033[27m' + line[line_pos-1])
+
+                    # invert next character
+                    self.put('\033[2C\033[7m' + line[line_pos])
+
+                    line_pos -= 1
+
             if c in '\n\r':
                 self.put(' ') # erase cursor
                 break
             elif c in '\177\010': #DEL or BS
                 if len(line) > 0:
                     line = line[:-1]
+                    line_pos -= 1
                     self.put(' \010\010') # delete block, move cursor back
+            elif c == '\033':
+                escape_code += c
+                escape_seq = True
             else:
                 self.put(c) # replace cursor with character
+                line_pos += 1
                 line += c
 
         return line
@@ -229,7 +271,7 @@ class Process:
         Process.commands[cmd_str] = proc
 
 
-    def putln(self, s: str):
+    def putln(self, s: str = None):
         '''helper function to reduce typing'''
         self.state.putln(s)
     def put(self, s: str):
@@ -327,12 +369,54 @@ class cmd_line(Process):
         self.putln(f'command not found: "{argv[0]}"')
         return
 
-    def __str__(self):
-        return 'cmd_line {\n' +\
-        f'    current_line: {self.current_line}\n' +\
-        f'    self.return_from_call: {self.return_from_call}\n' +\
-        '}'
 
+    def getline(self):
+        '''
+        reads a line from the input  \'stream\'. Blocks until there is something
+        in the queue.
+
+        this functions performs  the line editing operations that  you would see
+        from a tty driver (ie backspace, echoing the character, etc.)
+        '''
+        block = '█'
+        line = ''
+
+        final_set = string.ascii_letters + '@[]\\^_`{}|~'
+        escape_seq = False
+        escape_code = ''
+
+        while True:
+            self.put(block + '\010')
+
+            # get and validate a character
+            c = self.istream.get()
+            if len(c) != 1:
+                raise LengthError
+
+            # process the escape code (but don't print it)
+            if escape_seq:
+                escape_code += c
+                if c in final_set:
+                    self.escape_sequence(escape_code)
+                    escape_code = ''
+                    escape_seq = False
+                continue
+
+            if c in '\n\r':
+                self.put(' ') # erase cursor
+                break
+            elif c in '\177\010': #DEL or BS
+                if len(line) > 0:
+                    line = line[:-1]
+                    self.put(' \010\010') # delete block, move cursor back
+            elif c == '\033':
+                escape_code += c
+                escape_seq = True
+            else:
+                self.put(c) # replace cursor with character
+                line += c
+
+        return line
 
 class _setexpr(Process):
     """
@@ -481,27 +565,91 @@ class _eval(Process):
 
         exp = self.state.expressions[argv[1]]
 
-        exp.evaluate_funcs(env=self.state.expressions)
+        try:
+            exp.evaluate_funcs(env=self.state.expressions)
+        except Exception as e:
+            self.putln(f'error during evaluation: {e}')
+            return
 
         # XXX probably don't need to fix the variables twice.
         # fix the variables
         exp.dir.clear()
         exp.map()
 
-        eval_result = exp.evaluate()
+        try:
+            eval_result = exp.evaluate()
+        except Exception as e:
+            self.putln(f'error during evaluation: {e}')
+            return
+
         if eval_result != None:
             self.putln(f'    ⍄ {str(eval_result)}')
 
         self.putln(f'    {argv[1]} <- {str(exp)}')
 
 class _table(Process):
-    help_lis = [
+    help_list = [
         ('Description', 'Creates a table of values which can be used for plotting, evaluating, etc.'),
         ('Usage', 'table l w')
     ]
 
-    def run(self, argv: list, state):
+    def run(self):
         pass
+
+class _mathilda(Process):
+    '''evaluates the given expression'''
+    help_list = [
+        ('Description', 'Calculator AI Assistant'),
+        ('Usage',\
+         '''\
+         mathilda reset  # resets conversation
+         mathilda nocontext
+         mathilda        # starts new/picks up previous conversation
+         ''',
+         'Note',\
+         '''\
+         Mathilda only works if there is internet access. when you ask a question,
+         the current context
+         ''')
+    ]
+
+    assistant = None
+    def run(self):
+        if _mathilda.assistant == None:
+            _mathilda.assistant = assistant.convo()
+
+        convo = None
+        # reset conversation if required
+        if len(self.argv) == 2 and self.argv[1] == 'reset':
+            _mathilda.assistant = assistant.convo()
+            _mathilda.assistant.add_context(self.get_context(), 'default')
+            self.putln('conversation reset')
+            return
+        elif len(self.argv) == 2 and self.argv[1] == 'nocontext':
+            convo = assistant.convo()
+        elif len(self.argv) == 1:
+            _mathilda.assistant.add_context(self.get_context(), 'default')
+            convo = _mathilda.assistant
+        else:
+            self.putln('argument error: unrecognized arguments')
+
+        while True:
+            self.put('mathilda> ')
+            query = self.getline()
+            self.putln()
+
+            if query == 'exit':
+                break
+
+            response = _mathilda.assistant.query(query)
+            self.putln(response)
+
+    def get_context(self):
+        return ' '.join(\
+            map(\
+                lambda e: f'<{e}: {self.state.expressions[e]}>',\
+                self.state.expressions
+            ))
 
 Process.register(_setexpr)
 Process.register(_list)
@@ -510,6 +658,7 @@ Process.register(_exit)
 Process.register(_echo)
 Process.register(_eval)
 Process.register(_table)
+Process.register(_mathilda)
 
 ################################################
 class ExpFunctionError(Exception):
