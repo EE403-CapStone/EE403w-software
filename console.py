@@ -142,7 +142,7 @@ class Terminal(QtWidgets.QScrollArea):
         self.cur_x = 0
         self.cur_y = 0
 
-        self.linebuf = [bytearray()]
+        self.linebuf = [[]]
 
     def setText(self, text):
         self.label.setText(text)
@@ -170,7 +170,7 @@ class Terminal(QtWidgets.QScrollArea):
     def refresh_text(self):
         text = ''
         for line in self.linebuf:
-            text += line.decode() + '\n'
+            text += ''.join(line) + '\n'
 
         self.setText(text)
 
@@ -178,23 +178,23 @@ class Terminal(QtWidgets.QScrollArea):
         for c in txt:
             # create new lines as needed
             while len(self.linebuf) <= self.cur_y:
-                self.linebuf.append(bytearray())
+                self.linebuf.append([])
 
             # create space in line as needed
             while len(self.linebuf[self.cur_y]) <= self.cur_x:
-                self.linebuf[self.cur_y].append(ord(' '))
+                self.linebuf[self.cur_y].append(' ')
 
             if c == '\n':
                 self.cur_y += 1
             elif c == '\r':
                 self.cur_x = 0
             elif c == '\177': #DEL
-                self.linebuf[self.cur_y][self.cur_x] = ord(' ')
+                self.linebuf[self.cur_y][self.cur_x] = ' '
             elif c == '\010': #BS
                 if self.cur_x >= 1:
                     self.cur_x -= 1
             else:
-                self.linebuf[self.cur_y][self.cur_x] = ord(c)
+                self.linebuf[self.cur_y][self.cur_x] = c
                 self.cur_x += 1
 
         self.refresh_text()
@@ -203,11 +203,8 @@ class Terminal(QtWidgets.QScrollArea):
         while True:
             try:
                 c = self.ostream.get_nowait()
-                if len(c) != 1:
-                    raise command_line.LengthError
 
                 self.write(c)
-
             except Empty:
                 break
 
@@ -216,6 +213,11 @@ class Terminal(QtWidgets.QScrollArea):
         scrollbar = self.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
+
+    def exit(self):
+        for c in 'exit\n':
+            self.istream.put(c)
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -223,9 +225,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         istream = self.interpreter.state.istream
         ostream = self.interpreter.state.ostream
-        self.output_hist = Terminal(self, istream, ostream)
+        self.terminal = Terminal(self, istream, ostream)
 
-        #self.output_hist.setReadOnly(True)
+        #self.terminal.setReadOnly(True)
 
         self.cmd_input = QtWidgets.QLineEdit()
         self.environment_list = QtWidgets.QListWidget()
@@ -235,7 +237,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.layout = QtWidgets.QVBoxLayout(self.centralWidget()) # add layout to central widget
         self.hlayout = QtWidgets.QHBoxLayout()
-        self.hlayout.addWidget(self.output_hist, stretch=10)
+        self.hlayout.addWidget(self.terminal, stretch=10)
         self.hlayout.addWidget(self.environment_list)
 
         self.layout.addLayout(self.hlayout)
@@ -247,9 +249,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # connect signals/slots
 
         #ev = KeyEventHandler(self)
-        #self.output_hist.installEventFilter(ev)
-        self.interpreter.recv_txt.connect(self.output_hist.recv_text)
+        self.interpreter.recv_txt.connect(self.terminal.recv_text)
         self.interpreter.flush()
+
+        self.interpreter.recv_txt.connect(self.update_listview)
 
         # load icons
         self.expression_list_icon = QtGui.QIcon()
@@ -278,6 +281,19 @@ class MainWindow(QtWidgets.QMainWindow):
             help_menu.addAction(action)
 
         self.menuBar().addAction(new_act)
+
+
+    def update_listview(self):
+        self.environment_list.clear()
+        exprs = self.interpreter.state.expressions
+        for e in exprs:
+            label = f'{e}: {str(exprs[e])}'
+
+            item = QtWidgets.QListWidgetItem()
+            item.setIcon(self.expression_list_icon)
+            item.setText(label)
+
+            self.environment_list.addItem(item)
 
 """
 this is the user input loop. It collects and parses user input.
@@ -321,4 +337,5 @@ if __name__ == "__main__":
 
     app.exec()
 
+    widget.terminal.exit()
     sys.exit()
