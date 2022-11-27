@@ -8,6 +8,7 @@ from command_line import Process
 import io
 from queue import Queue, Empty
 import threading
+from collections import namedtuple
 
 class Interpreter(QObject):
     '''
@@ -112,7 +113,6 @@ class KeyEventHandler(QtCore.QObject):
 
         self.output_hist.setText(output)
 
-
 class Terminal(QtWidgets.QScrollArea):
     '''
     "Dumb" terminal. It does dumb terminal things, like send/recieve characters,
@@ -124,22 +124,28 @@ class Terminal(QtWidgets.QScrollArea):
         super().__init__(parent)
         self.setWidgetResizable(True)
 
-        self.text = QLabel(self)
+        self.label = QLabel(self)
 
-        self.text.setWordWrap(True)
-        self.text.setScaledContents(False)
-        self.text.setContentsMargins(0,0,0,0)
-        self.text.setFrameStyle(QtWidgets.QFrame.Box)
-        self.text.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
-        self.text.setAlignment(QtCore.Qt.AlignTop)
+        self.label.setWordWrap(True)
+        self.label.setScaledContents(False)
+        self.label.setContentsMargins(0,0,0,0)
+        self.label.setFrameStyle(QtWidgets.QFrame.Box)
+        self.label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
+        self.label.setAlignment(QtCore.Qt.AlignTop)
 
-        super().setWidget(self.text)
+        super().setWidget(self.label)
 
         self.istream = istream
         self.ostream = ostream
 
+        # cursor position
+        self.cur_x = 0
+        self.cur_y = 0
+
+        self.linebuf = [bytearray()]
+
     def setText(self, text):
-        self.text.setText(text)
+        self.label.setText(text)
 
     def keyPressEvent(self, event):
         UP_ARROW = 16777235
@@ -161,29 +167,49 @@ class Terminal(QtWidgets.QScrollArea):
             # standard event processing
             return QtCore.QObject.eventFilter(self, obj, event)
 
-    def append(self, c:str):
-        txt = self.text.text() + c
-        self.text.setText(txt)
+    def refresh_text(self):
+        text = ''
+        for line in self.linebuf:
+            text += line.decode() + '\n'
+
+        self.setText(text)
+
+    def write(self, txt:str):
+        for c in txt:
+            # create new lines as needed
+            while len(self.linebuf) <= self.cur_y:
+                self.linebuf.append(bytearray())
+
+            # create space in line as needed
+            while len(self.linebuf[self.cur_y]) <= self.cur_x:
+                self.linebuf[self.cur_y].append(ord(' '))
+
+            if c == '\n':
+                self.cur_y += 1
+            elif c == '\r':
+                self.cur_x = 0
+            elif c == '\177': #DEL
+                self.linebuf[self.cur_y][self.cur_x] = ord(' ')
+            elif c == '\010': #BS
+                if self.cur_x >= 1:
+                    self.cur_x -= 1
+            else:
+                self.linebuf[self.cur_y][self.cur_x] = ord(c)
+                self.cur_x += 1
+
+        self.refresh_text()
 
     def recv_text(self):
-        # get text from the output stream
-        txt = self.text.text()
         while True:
             try:
                 c = self.ostream.get_nowait()
                 if len(c) != 1:
                     raise command_line.LengthError
 
-                if c == '\x7f':
-                    txt = txt[:-1]
-                else:
-                    txt += c
+                self.write(c)
 
             except Empty:
                 break
-
-        self.text.setText(txt)
-        self.repaint()
 
         # scroll output view to bottom if necessary
         # BUG the scroll view isn't getting updated for some reason.
