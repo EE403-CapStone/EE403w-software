@@ -127,12 +127,13 @@ class Terminal(QtWidgets.QScrollArea):
 
         self.label = QLabel(self)
 
+        self.label.setStyleSheet('background-color: white')
         self.label.setWordWrap(True)
-        self.label.setScaledContents(False)
-        self.label.setContentsMargins(0,0,0,0)
-        self.label.setFrameStyle(QtWidgets.QFrame.Box)
+        self.label.setContentsMargins(5,5,5,5)
         self.label.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Ignored)
         self.label.setAlignment(QtCore.Qt.AlignTop)
+        self.setFrameStyle(QtWidgets.QFrame.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         super().setWidget(self.label)
 
@@ -214,6 +215,9 @@ class Terminal(QtWidgets.QScrollArea):
         scrollbar = self.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
 
+    def tx(self, s: str):
+        for c in s:
+            self.istream.put(c)
 
     def exit(self):
         for c in 'exit\n':
@@ -230,19 +234,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         #self.terminal.setReadOnly(True)
 
-        self.cmd_input = QtWidgets.QLineEdit()
         self.environment_list = QtWidgets.QListWidget()
+        self.environment_list.setFrameStyle(QtWidgets.QFrame.Panel)
+        self.environment_list.setFrameShadow(QtWidgets.QFrame.Sunken)
 
         # create main layout, QWindow (I think) is its parent
         self.setCentralWidget(QtWidgets.QWidget()) # central widget needs a placeholder
 
-        self.layout = QtWidgets.QVBoxLayout(self.centralWidget()) # add layout to central widget
-        self.hlayout = QtWidgets.QHBoxLayout()
-        self.hlayout.addWidget(self.terminal, stretch=10)
-        self.hlayout.addWidget(self.environment_list)
-
-        self.layout.addLayout(self.hlayout)
-        self.layout.addWidget(self.cmd_input)
+        self.layout = QtWidgets.QHBoxLayout(self.centralWidget()) # add layout to central widget
+        self.layout.addWidget(self.terminal, stretch=10)
+        self.layout.addWidget(self.environment_list)
 
         # add menu bar
         self._add_menu_bar()
@@ -277,7 +278,7 @@ class MainWindow(QtWidgets.QMainWindow):
             action = QtGui.QAction(k, self)
 
             # XXX WOOO CLOSURES!!!!
-            action.triggered.connect((lambda cmd: lambda: self.print(cmd.help()))(v))
+            action.triggered.connect((lambda cmd: lambda: self.terminal.tx(f'\nhelp {cmd.__name__[1:]}\n'))(v))
 
             help_menu.addAction(action)
 
