@@ -61,7 +61,7 @@ class expr:
         if s[0].isalpha():  # if s begins with a character in the alphabet return s as variable throws an error if incorrect format
             for l in s:
                 try:
-                    assert l.isalpha() or l.isdigit()
+                    assert l.isalpha() or l.isdigit() or l=='_'
                 except AssertionError:
                     raise Exception (l+': is not a valid variable')
             return s
@@ -1211,7 +1211,9 @@ def next_operator(exp_list):
 
     for op in operator:
         if op in exp_list:
-            return exp_list.index(op)
+            if op=='^':
+                return exp_list.index('^')
+            return len(exp_list)-exp_list[::-1].index(op)-1
 
 
 def integrate(root,var):
@@ -1259,3 +1261,4 @@ class node:
 if __name__=="__main__":
     import doctest
     doctest.testmod()
+    print(doctest.testfile('axioms_test.txt',report=True))
