@@ -4,10 +4,8 @@
 # Axioms_2 is a symbolic math library that converts mathematical statements binary trees
 # This is for the purposes of automating symbolic math operations that 
 # undergraduates and professional engineers frequent
-
-import doctest
-from enum import unique
 import numpy as np
+
 
 class expr:
     def __init__(self,exp:str=None,root=None,**kwargs):
