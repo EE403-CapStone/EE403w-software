@@ -333,37 +333,37 @@ class expr:
             upper-=a*z.evaluate(val_dict={var:upper})*dir.evaluate(val_dict={var:upper})
             lower-=a*z.evaluate(val_dict={var:lower})*dir.evaluate(val_dict={var:lower})
 
-        return upper
+        return float(f'{upper:.{precision-1}e}')
     
-    def num_int(self,a,b,var,precision):
+    def num_int(self,a,b,var,precision:int=3):
         if self.evaluate(val_dict={var:np.random.rand()})==None:
             raise Exception('Cannot perform numerical Integration')
         
-        n = 1000
+        n = 200000
         l = self.left_Rsum(n,a,b,var)
         r = self.right_Rsum(n,a,b,var)
-
+        counter = 0
         while f'{l:.{precision}e}'!=f'{r:.{precision}e}':
-            n=int(n*np.e)
+            n+=200000
             l = self.left_Rsum(n,a,b,var)
             r = self.right_Rsum(n,a,b,var)
         
-        return l
+        return float(f'{l:.{precision-1}e}')
 
     def right_Rsum(self,n,a,b,var):
-        w = (a-b)/n
+        w = (b-a)/n
         s = 0
-        x = a
-        for i in range(1,n+1):
+        x = a+w
+        for i in range(n-1):
             x+=w
             s+= self.evaluate(val_dict={var:x})*w
         return s
 
     def left_Rsum(self,n,a,b,var):
-        w = (a-b)/n
+        w = (b-a)/n
         s = 0
         x = a
-        for i in range(n):
+        for i in range(n-1):
             x+=w
             s+= self.evaluate(val_dict={var:x})*w
         return s
