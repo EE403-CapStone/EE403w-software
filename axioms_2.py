@@ -315,40 +315,60 @@ class expr:
         if precision>18:
             raise Exception('To many units of percision')
         r = np.random.rand()
-        temp = _copy(self.root)
-        if temp.val=='=':
-            temp = node('-',temp.left,temp.right)
-        dir = expr(root=temp).pD(var)
-        temp = expr(root = node('/',temp,dir.root))
-        for i in range(10000):
+        z = _copy(self.root)
+        if z.val=='=':
+            z = node('-',z.left,z.right)
+        z = expr(root=z)
+        dir = expr(root=z.root).pD(var)
+        temp = expr(root = node('/',z.root,dir.root))
+        for i in range(1000):
             r-=temp.evaluate(val_dict={var:r})
 
         d = dir.evaluate(val_dict={var:r})
+
         upper = r if d>0 else r-2*self.evaluate(val_dict={var:r})/d
         lower = r if d<0 else r-2*self.evaluate(val_dict={var:r})/d
-        a = np.abs(d)*1000
+        a = np.abs(d)*10
         a = 1/a
-        print(f'{upper}\t{lower}')
 
-        counter = 0
-        if d>0:
-            while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
-                upper-=a*self.evaluate(val_dict={var:upper})
-                lower-=a*self.evaluate(val_dict={var:lower})
-                print(f'{upper}\t{lower}')
-                counter+=1
-                if counter>100:
-                    break
-        else:
-            while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
-                upper+=a*self.evaluate(val_dict={var:upper})
-                lower+=a*self.evaluate(val_dict={var:lower})
-                print(f'{upper}\t{lower}')
-                counter+=1
-                if counter>100:
-                    break
+        while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
+            upper-=a*z.evaluate(val_dict={var:upper})*dir.evaluate(val_dict={var:upper})
+            lower-=a*z.evaluate(val_dict={var:lower})*dir.evaluate(val_dict={var:lower})
 
         return upper
+    
+    def num_int(self,a,b,var,precision):
+        if self.evaluate(val_dict={var:np.random.rand()})==None:
+            raise Exception('Cannot perform numerical Integration')
+        
+        n = 1000
+        l = self.left_Rsum(n,a,b,var)
+        r = self.right_Rsum(n,a,b,var)
+
+        while f'{l:.{precision}e}'!=f'{r:.{precision}e}':
+            n=int(n*np.e)
+            l = self.left_Rsum(n,a,b,var)
+            r = self.right_Rsum(n,a,b,var)
+        
+        return l
+
+    def right_Rsum(self,n,a,b,var):
+        w = (a-b)/n
+        s = 0
+        x = a
+        for i in range(1,n+1):
+            x+=w
+            s+= self.evaluate(val_dict={var:x})*w
+        return s
+
+    def left_Rsum(self,n,a,b,var):
+        w = (a-b)/n
+        s = 0
+        x = a
+        for i in range(n):
+            x+=w
+            s+= self.evaluate(val_dict={var:x})*w
+        return s
 
     def map(self,base = None,path = []):
         # Sets the index of the variable to the value index
