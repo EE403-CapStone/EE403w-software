@@ -4,10 +4,8 @@
 # Axioms_2 is a symbolic math library that converts mathematical statements binary trees
 # This is for the purposes of automating symbolic math operations that 
 # undergraduates and professional engineers frequent
-
-import doctest
-from enum import unique
 import numpy as np
+
 
 class expr:
     def __init__(self,exp:str=None,root=None,**kwargs):
@@ -61,7 +59,7 @@ class expr:
         if s[0].isalpha():  # if s begins with a character in the alphabet return s as variable throws an error if incorrect format
             for l in s:
                 try:
-                    assert l.isalpha() or l.isdigit()
+                    assert l.isalpha() or l.isdigit() or l=='_'
                 except AssertionError:
                     raise Exception (l+': is not a valid variable')
             return s
@@ -311,8 +309,64 @@ class expr:
         lines = [first_line, second_line] + [a + u * ' ' + b for a, b in zipped_lines]
         return lines, n + m + u, max(p, q) + 2, n + u // 2
 
-    def solve():
-        pass
+    def estimate(self,var:str,precision:int=3):
+        if precision>18:
+            raise Exception('To many units of percision')
+        r = np.random.rand()
+        z = _copy(self.root)
+        if z.val=='=':
+            z = node('-',z.left,z.right)
+        z = expr(root=z)
+        dir = expr(root=z.root).pD(var)
+        temp = expr(root = node('/',z.root,dir.root))
+        for i in range(1000):
+            r-=temp.evaluate(val_dict={var:r})
+
+        d = dir.evaluate(val_dict={var:r})
+
+        upper = r if d>0 else r-2*self.evaluate(val_dict={var:r})/d
+        lower = r if d<0 else r-2*self.evaluate(val_dict={var:r})/d
+        a = np.abs(d)*10
+        a = 1/a
+
+        while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
+            upper-=a*z.evaluate(val_dict={var:upper})*dir.evaluate(val_dict={var:upper})
+            lower-=a*z.evaluate(val_dict={var:lower})*dir.evaluate(val_dict={var:lower})
+
+        return float(f'{upper:.{precision-1}e}')
+    
+    def num_int(self,a,b,var,precision:int=3):
+        if self.evaluate(val_dict={var:np.random.rand()})==None:
+            raise Exception('Cannot perform numerical Integration')
+        
+        n = 200000
+        l = self.left_Rsum(n,a,b,var)
+        r = self.right_Rsum(n,a,b,var)
+        counter = 0
+        while f'{l:.{precision}e}'!=f'{r:.{precision}e}':
+            n+=200000
+            l = self.left_Rsum(n,a,b,var)
+            r = self.right_Rsum(n,a,b,var)
+        
+        return float(f'{l:.{precision-1}e}')
+
+    def right_Rsum(self,n,a,b,var):
+        w = (b-a)/n
+        s = 0
+        x = a+w
+        for i in range(n-1):
+            x+=w
+            s+= self.evaluate(val_dict={var:x})*w
+        return s
+
+    def left_Rsum(self,n,a,b,var):
+        w = (b-a)/n
+        s = 0
+        x = a
+        for i in range(n-1):
+            x+=w
+            s+= self.evaluate(val_dict={var:x})*w
+        return s
 
     def map(self,base = None,path = []):
         # Sets the index of the variable to the value index
@@ -1211,7 +1265,9 @@ def next_operator(exp_list):
 
     for op in operator:
         if op in exp_list:
-            return exp_list.index(op)
+            if op=='^':
+                return exp_list.index('^')
+            return len(exp_list)-exp_list[::-1].index(op)-1
 
 
 def integrate(root,var):
@@ -1244,7 +1300,6 @@ def integrate(root,var):
         pass
 
 
-
 class node:
     # Units of expression objects
     # Describes the structure of mathematical expressions in with 
@@ -1259,3 +1314,4 @@ class node:
 if __name__=="__main__":
     import doctest
     doctest.testmod()
+    print(doctest.testfile('axioms_test.txt',report=True))

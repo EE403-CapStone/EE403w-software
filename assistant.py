@@ -22,6 +22,7 @@ class convo:
       top_p=1,
       frequency_penalty=0,
       presence_penalty=0)
+    self.add_context(response.choices[0].text,question)
     return "Mathilda:"+response.choices[0].text
   
   def add_context(self,mathilda, user):
