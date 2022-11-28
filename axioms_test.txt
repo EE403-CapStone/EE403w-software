@@ -27,14 +27,154 @@ Test sections
     - returns work that can be followed/read by a person in a movable format
 
 
-Section 1.)
+Instantiating correctly
 ============================================================================
-
 >>> import numpy as np
->>> from axioms_2 import exp
->>> pi = exp('pi')
->>> pi.evaluate()==np.pi
-True
->>> e = exp('e')
->>> e.evaluate()==np.e
-True
+>>> from axioms_2 import *
+
+============================================================================
+Checking units of values
+
+Handling units of values
+
+>>> assert expr('pi').evaluate() ==np.pi
+>>> assert str(expr('pi'))=='pi'
+
+>>> assert expr('e').evaluate() ==np.e
+>>> assert str(expr('e'))=='e'
+
+>>> assert expr('j').evaluate() ==1j
+>>> assert str(expr('j'))==str(1j)
+
+>>> assert expr('True').evaluate() ==True
+>>> assert str(expr('True'))=='True'
+
+>>> assert expr('False').evaluate()==False
+>>> assert str(expr('False'))=='False'
+
+random float
+>>> r = np.random.rand()
+>>> assert expr(str(r)).evaluate()==r
+>>> assert str(expr(str(r))) == str(r)
+
+random complex
+>>> i = np.random.rand()
+>>> assert expr(str(r+i*1j)).evaluate()==r+i*1j
+>>> assert str(expr(str(r+i*1j))) == str(r+i*1j)[1:-1]
+
+valid variable
+>>> var='a'
+>>> assert expr(var).evaluate()==None
+>>> assert str(expr(var)) == var
+>>> var='a1'
+>>> assert expr(var).evaluate()==None
+>>> assert str(expr(var)) == var
+
+Invalid variable
+>>> var='a:'
+>>> try:
+...     expr(var)
+... except:
+...     print('exception occurred')
+exception occurred
+
+>>> var='1a'
+>>> try:
+...     expr(var)
+... except:
+...     print('exception occurred')
+exception occurred
+
+>>> var='a@'
+>>> try:
+...     expr(var)
+... except:
+...     print('exception occurred')
+exception occurred
+
+Instantiating the correct structures
+>>> a = expr('a=b')
+>>> assert a.root.val=='='
+>>> assert a.root.right.val=='b'
+>>> assert a.root.left.val=='a'
+
+>>> a = expr('a+b')
+>>> assert a.root.val=='+'
+>>> assert a.root.right.val=='b'
+>>> assert a.root.left.val=='a'
+
+>>> a = expr('a*b')
+>>> assert a.root.val=='*'
+>>> assert a.root.right.val=='b'
+>>> assert a.root.left.val=='a'
+
+>>> a = expr('a^b')
+>>> assert a.root.val=='^'
+>>> assert a.root.right.val=='b'
+>>> assert a.root.left.val=='a'
+
+>>> a = expr('a==b')
+>>> assert a.root.val=='=='
+
+>>> a = expr('a<b')
+>>> assert a.root.val=='<'
+
+>>> a = expr('a>b')
+>>> assert a.root.val=='>'
+
+>>> a = expr('a<b')
+>>> assert a.root.val=='<'
+
+>>> a = expr('a<=b')
+>>> assert a.root.val=='<='
+
+>>> a = expr('sin(a)')
+>>> assert a.root.val=='sin'
+>>> assert a.root.right.val=='a'
+
+>>> a = expr('arb_func(a)')
+>>> assert a.root.val=='arb_func'
+>>> assert a.root.right.val==['a']
+
+PEMDAS order of operation
+Parhentesis are implicitly checked
+==============================================================================
+Subtraction
+>>> assert expr('5-3-7').evaluate()==5-3-7
+>>> assert expr('5-3+7').evaluate()==5-3+7
+>>> assert expr('5-3/7').evaluate()==5-3/7
+>>> assert expr('5-3*7').evaluate()==5-3*7
+>>> assert expr('5-3^2').evaluate()==5-3**2
+>>> assert expr('5-(3*7)').evaluate()==5-(3*7)
+
+Addition
+>>> assert expr('5+3-7').evaluate()==5+3-7
+>>> assert expr('5+3+7').evaluate()==5+3+7
+>>> assert expr('5+3/7').evaluate()==5+3/7
+>>> assert expr('5+3*7').evaluate()==5+3*7
+>>> assert expr('5+3^2').evaluate()==5+3**2
+>>> assert expr('5+(3*7)').evaluate()==5+(3*7)
+
+Division
+>>> assert expr('5/3-7').evaluate()==5/3-7
+>>> assert expr('5/3+7').evaluate()==5/3+7
+>>> assert expr('5/3/7').evaluate()==5/3/7
+>>> assert expr('5/3*7').evaluate()==5/3*7
+>>> assert expr('5/3^2').evaluate()==5/3**2
+>>> assert expr('5/(3*7)').evaluate()==5/(3*7)
+
+Multiplication
+>>> assert expr('5*3-7').evaluate()==5*3-7
+>>> assert expr('5*3+7').evaluate()==5*3+7
+>>> assert expr('5*3/7').evaluate()==5*3/7
+>>> assert expr('5*3*7').evaluate()==5*3*7
+>>> assert expr('5*3^2').evaluate()==5*3**2
+>>> assert expr('5*(3+7)').evaluate()==5*(3+7)
+
+Exponentiation
+>>> assert expr('5^3-7').evaluate()==5**3-7
+>>> assert expr('5^3+7').evaluate()==5**3+7
+>>> assert expr('5^3/7').evaluate()==5**3/7
+>>> assert expr('5^3*7').evaluate()==5**3*7
+>>> assert expr('5^3^2').evaluate()==5**3**2
+>>> assert expr('5^(3+7)').evaluate()==5**(3+7)

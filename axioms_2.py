@@ -311,8 +311,34 @@ class expr:
         lines = [first_line, second_line] + [a + u * ' ' + b for a, b in zipped_lines]
         return lines, n + m + u, max(p, q) + 2, n + u // 2
 
-    def solve():
-        pass
+    def estimate(self,var:str,precision:int=3):
+        if precision>18:
+            raise Exception('To many units of percision')
+        r = np.random.rand()
+        temp = _copy(self.root)
+        if temp.val=='=':
+            temp = node('-',temp.left,temp.right)
+        dir = expr(root=temp).pD(var)
+        temp = expr(root = node('/',temp,dir.root))
+        for i in range(10000):
+            r-=temp.evaluate(val_dict={var:r})
+
+        a = dir.evaluate(val_dict={var:r})/100
+        
+        d = dir.evaluate(val_dict={var:r})
+        upper = r if d>0 else r-2*self.evaluate(val_dict={var:r})/d
+        lower = r if d<0 else r-2*self.evaluate(val_dict={var:r})/d
+        a = np.abs(a)
+        if d>0:
+            while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
+                upper-=a*self.evaluate(val_dict={var:r})
+                lower+=a*self.evaluate(val_dict={var:r})
+        else:
+            while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
+                upper+=a*self.evaluate(val_dict={var:r})
+                lower-=a*self.evaluate(val_dict={var:r})
+
+        return upper
 
     def map(self,base = None,path = []):
         # Sets the index of the variable to the value index
@@ -1244,7 +1270,6 @@ def integrate(root,var):
     if root.val=='*':
         # need to create an algorithm that can check if function is of form f'*g'(f) ie chain rule
         pass
-
 
 
 class node:
