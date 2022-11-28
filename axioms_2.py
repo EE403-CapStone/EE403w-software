@@ -323,20 +323,30 @@ class expr:
         for i in range(10000):
             r-=temp.evaluate(val_dict={var:r})
 
-        a = dir.evaluate(val_dict={var:r})/100
-        
         d = dir.evaluate(val_dict={var:r})
         upper = r if d>0 else r-2*self.evaluate(val_dict={var:r})/d
         lower = r if d<0 else r-2*self.evaluate(val_dict={var:r})/d
-        a = np.abs(a)
+        a = np.abs(d)*1000
+        a = 1/a
+        print(f'{upper}\t{lower}')
+
+        counter = 0
         if d>0:
             while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
-                upper-=a*self.evaluate(val_dict={var:r})
-                lower+=a*self.evaluate(val_dict={var:r})
+                upper-=a*self.evaluate(val_dict={var:upper})
+                lower-=a*self.evaluate(val_dict={var:lower})
+                print(f'{upper}\t{lower}')
+                counter+=1
+                if counter>100:
+                    break
         else:
             while f'{upper:.{precision}e}'!= f'{lower:.{precision}e}':
-                upper+=a*self.evaluate(val_dict={var:r})
-                lower-=a*self.evaluate(val_dict={var:r})
+                upper+=a*self.evaluate(val_dict={var:upper})
+                lower+=a*self.evaluate(val_dict={var:lower})
+                print(f'{upper}\t{lower}')
+                counter+=1
+                if counter>100:
+                    break
 
         return upper
 
