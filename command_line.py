@@ -531,6 +531,13 @@ class _exit(Process):
 
         self.state.exit_prog = True
 
+class _command(Process):
+    def run(self):
+        self.getline()
+        self.putln()
+        pass
+
+
 class _echo(Process):
     '''prints its arguments to the screen'''
     help_list = [
@@ -605,11 +612,12 @@ class _mathilda(Process):
          mathilda reset  # resets conversation
          mathilda nocontext
          mathilda        # starts new/picks up previous conversation
-         ''',
-         'Note',\
+         '''),\
+        ('Note',\
          '''\
-         Mathilda only works if there is internet access. when you ask a question,
-         the current context
+         Mathilda  only works  if  there  is internet  access.  when  you ask  a
+         question, the  current context  (all currently defined  expressions) is
+         included in the query
          ''')
     ]
 
