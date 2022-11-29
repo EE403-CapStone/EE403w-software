@@ -15,7 +15,7 @@ class convo:
   def query(self,question):
     question = ''.join(self.context)+question
     response = openai.Completion.create(
-      model="text-davinci-002",
+      model="text-davinci-003",
       prompt=question,
       temperature=0.7,
       max_tokens=256,
